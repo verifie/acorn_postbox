@@ -39,7 +39,7 @@ module test;
 
 	// Output waveform file for this test
 	initial begin
-		$dumpfile("tests/test_input_chained.lxt2");
+		$dumpfile("tests/test_input_chained.vcd");
 		$dumpvars(0, test);
 	end
 
@@ -56,16 +56,14 @@ module test;
 	wire testack;
 	initial testreq = 1'b0;
 
-	// LCD interface
-	wire [3:0] lcd_data;
-	wire lcd_rs, lcd_e;
-
 	// Transmit interface
 	reg [7:0] txin;
 	reg txpend;
 
 	initial txpend = 1'b0;
 	initial txin = 8'd0;
+
+	wire want_tx;
 
 	// Transmit interface is omitted, display adapters always tx 0x00
 
@@ -75,12 +73,10 @@ module test;
 		.testreq(testreq),
 		.testack(testack),
 
-		.lcd_data(lcd_data),
-		.lcd_rs(lcd_rs),
-		.lcd_e(lcd_e),
-
 		.txin(txin),			// always transmit 0x00, display interface
-		.tx_pending(txpend)
+		.tx_pending(txpend),
+
+		.want_tx(want_tx)
 	);
 
 `include "tasks.v"
@@ -111,10 +107,12 @@ module test;
 
 		// Send five chained bytes
 		reqcount = 0;
-		repeat(5) begin
+`define REPEATS 5
+`define CLOCKS_PER_REPEAT 11
+		repeat(`REPEATS) begin
 			txin = 8'h5A;
-			txpend = 1;
-			repeat (9) begin
+			txpend = 1;  // raise tx_pending, so postcode always transmits
+			repeat (`CLOCKS_PER_REPEAT) begin
 				// 8 data bit clocks plus the ack
 				pulse(1);
 			end
@@ -126,8 +124,8 @@ module test;
 		end
 		#BREAK;			// break to clear the FSM down
 
-		if (reqcount != (9*5)) begin
-			$display("*** DUT ERROR at t=%d. Request clock count mismatch. Got %d", $time, reqcount);
+		if (reqcount != (`REPEATS*`CLOCKS_PER_REPEAT)) begin
+			$display("*** DUT ERROR at t=%d. Request clock count mismatch. Got %d, expected %d", $time, reqcount, `REPEATS*`CLOCKS_PER_REPEAT);
 			$finish;
 		end
 

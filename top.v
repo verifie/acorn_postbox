@@ -44,7 +44,7 @@ output _PGND2
 
   wire [7:0] rxdata;
   wire rxready;
-  wire rxstrobe;
+  wire txstrobe;
   
   postcode p(
 			.refclk(DIL_1_GCK),		// refclk
@@ -53,7 +53,7 @@ output _PGND2
 			
 			.rxout(rxdata),			// received data
 			.rxready(rxready),		// receive ready (1=ready)
-			.rxstrobe(rxstrobe),		// receive strobe (1=data in rxout)
+			.txstrobe(txstrobe),		// receive strobe (1=data in rxout)
 			
 			.txin(8'd0),				// TX data in (for INPUT command) -- 0 indicates a display
 			.tx_pending(1'b1)			// TX data pending
@@ -67,10 +67,14 @@ output _PGND2
 	
 	reg[7:0] rxlatch;
 	reg lcd_e_long;
-	wire lcd_e_masked = (!rxdata[0]) & rxstrobe;
+	wire lcd_e_masked = (!rxdata[0]) & txstrobe;
 	always @(posedge lcd_e_masked) begin
+		$display("txstrobe & !rxdata[0] posedge: latching rxdata");
 		// Latch the LCD data on every E-strobe
 		rxlatch <= rxdata;
+	end
+	always @(posedge txstrobe) begin
+		$display("txstrobe posedge: rxdata=%x", rxdata);
 	end
 
 	always @(posedge lcd_e_masked or posedge DIL_2_GCK) begin
@@ -92,7 +96,7 @@ output _PGND2
 	
 	// Monostable to generate the 5ms lockout
 	localparam LCD_CMD_TMAX = (5000*12);
-	reg[15:0] lcd_cmd_timer;
+	reg[15:0] lcd_cmd_timer = 16'hFFFF;
 	always @(posedge DIL_1_GCK or posedge lcd_e_long) begin
 		if (lcd_e_long) begin
 			lcd_cmd_timer <= 0;

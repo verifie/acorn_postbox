@@ -1,0 +1,37 @@
+# Copyright 2017 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+### Connections to target Acorn machine
+NET testreq_in LOC = P34;   # POST pin 3
+NET testack_out LOC = P36;  # POST pin 4
+NET reset_out LOC = P37;    # POST pin 5
+
+### Reference clock
+NET clock_in_2mhz BUFG = CLK;
+NET clock_in_2mhz LOC = P43;  # MCU PA10
+
+### Connections to MCU
+
+# SPI port
+NET spi_mosi LOC = P44;   # MCU PA08
+NET spi_sck LOC = P1;     # MCU PA09
+NET spi_cs LOC = P2;      # MCU PA14 (previously PA10)
+NET spi_miso LOC = P3;    # MCU PA15 (previously PA11)
+
+# Control and metadata
+NET rx_ready LOC = P5;    # MCU PA11 (previously PA15); MCU is ready to receive
+NET tx_pending LOC = P6;  # MCU PA16; MCU just put a byte in SPI buffer in response to 1 on want_tx
+NET want_tx LOC = P8;     # MCU PA17; Target wants data from MCU -- MCU should put in SPI buffer then pulse tx_pending
+NET reset_in LOC = P7;    # MCU PA28; Active high reset signal from MCU
+NET last_transaction_was_input LOC = P42;  # MCU PA02

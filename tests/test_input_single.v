@@ -16,7 +16,7 @@ module test;
 
 	// Output waveform file for this test
 	initial begin
-		$dumpfile("tests/test_input.lxt2");
+		$dumpfile("tests/test_input_single.vcd");
 		$dumpvars(0, test);
 	end
 
@@ -33,10 +33,6 @@ module test;
 	wire testack;
 	initial testreq = 1'b0;
 
-	// LCD interface
-	wire [3:0] lcd_data;
-	wire lcd_rs, lcd_e;
-
 	// Transmit interface
 	reg [7:0] txin;
 	reg txpend;
@@ -51,10 +47,6 @@ module test;
 		.refclk(refclk),
 		.testreq(testreq),
 		.testack(testack),
-
-		.lcd_data(lcd_data),
-		.lcd_rs(lcd_rs),
-		.lcd_e(lcd_e),
 
 		.txin(txin),			// always transmit 0x00, display interface
 		.tx_pending(txpend)
@@ -90,8 +82,8 @@ module test;
 		// Send <WS> waitstates followed by an ACK and 8 data bits
 		x = 0;
 		txin = 8'h5A;
-		while (x < 8+WS) begin		// 8 data bit clocks plus wait states
-			//$display("lastAck = %d, x = %d", lastAck, x);
+		while (x < 9+WS) begin		// 8 data bit clocks plus wait states
+			$display("--- lastAck = %d, x = %d", lastAck, x);
 			pulse(1);
 			x += 1;
 
@@ -100,6 +92,7 @@ module test;
 			end else if (x >= WS) begin
 				txpend = 1'b0;
 			end
+			#1;
 		end
 		#BREAK;			// break to clear the FSM down
 

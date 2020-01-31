@@ -3,7 +3,7 @@
 module test;
 
 	// Clock period, ns
-	parameter CLOCK_PERIOD = 500;
+	parameter CLOCK_PERIOD = 83;
 
 	// Pulse width, gap and break delay
 	parameter PWID  = 500;
@@ -16,11 +16,11 @@ module test;
 
 	// Output waveform file for this test
 	initial begin
-		$dumpfile("tests/test_output.lxt2");
+		$dumpfile("tests/test_output.vcd");
 		$dumpvars(0, test);
 	end
 
-	// 2MHz reference clock
+	// 12MHz reference clock
 	reg refclk;
 	initial
 		refclk = 1'b0;
@@ -40,17 +40,18 @@ module test;
 	// Transmit interface is omitted, display adapters always tx 0x00
 
 	// Instantiate the module we're testing
-	postcode p(
-		.refclk(refclk),
-		.testreq(testreq),
-		.testack(testack),
+	top t(
+		.DIL_1_GCK(refclk),
+		.DIL_2_GCK(testreq),
+		.DIL_3(testack),
 
-		.lcd_data(lcd_data),
-		.lcd_rs(lcd_rs),
-		.lcd_e(lcd_e),
+		.DIL_27(lcd_data[3]),
+		.DIL_26(lcd_data[2]),
+		.DIL_25(lcd_data[1]),
+		.DIL_24(lcd_data[0]),
 
-		.txin(8'd0),			// always transmit 0x00, display interface
-		.tx_pending(1'b1)
+		.DIL_23(lcd_rs),
+		.DIL_22(lcd_e)
 	);
 
 
@@ -83,7 +84,7 @@ module test;
 
 		// Send a byte
 		lcd_e_count = 0;
-		outbyte(8'h09);
+		outbyte(8'ha8);
 		$display($time, "<< LCD state PreRead  -- data 0x%X, RS=%d E-strobes=%d >>", lcd_data, lcd_rs, lcd_e_count);
 		if (lcd_e_count != 0) begin
 			$display("*** DUT ERROR at time %d. LCD E-strobe count mismatch -- is %d, wanted 0.", $time, lcd_e_count);
@@ -93,7 +94,7 @@ module test;
 
 		// Send an INPUT chaser and see if we got an E-strobe from the LCD
 		lcd_e_count = 0;
-		pulsebreak(12);
+		pulsebreak(14);
 		#1000;
 		$display($time, "<< LCD state PostRead -- data 0x%X, RS=%d E-strobes=%d >>", lcd_data, lcd_rs, lcd_e_count);
 		if (lcd_e_count != 1) begin

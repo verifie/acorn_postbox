@@ -6,6 +6,7 @@
 task pulse;
 	input [7:0] n;
 	begin
+		//$display("pulse(%d)", n);
 		repeat(n) begin
 			testreq=1'b1;
 			#PWID;
@@ -24,6 +25,7 @@ task pulsebreak;
 	input [7:0] n;
 	begin
 		pulse(n);
+		//$display("pulse break");
 		#BREAK;
 	end
 endtask
@@ -57,7 +59,7 @@ endtask
 reg lastAck;
 initial lastAck = 1'b0;
 always @(posedge testreq) begin
-	#10 lastAck = (testack == 1'b1) ? 1'b1 : 1'b0;
+	#10 lastAck = (testack === 1'b1) ? 1'b1 : 1'b0;
 end
 
 // Track the number of TESTREQ pulses
