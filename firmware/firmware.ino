@@ -765,7 +765,7 @@ void loop() {
       case 'R': {
         Serial.println("Reading ROM data");
         uint32_t rom_start = (machine == ARCHIMEDES) ? 0x3800000 : 0;
-        read_words_from_memory(rom_start, 16);
+        read_words_from_memory(rom_start, 8 * 1024 * 1024);
         break;
       }
       case 'r': {

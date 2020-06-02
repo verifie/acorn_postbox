@@ -39,7 +39,7 @@ module test;
 
 	// Output waveform file for this test
 	initial begin
-		$dumpfile("tests/test_input_chained.vcd");
+		$dumpfile("tests/test_input_chained.lxt2");
 		$dumpvars(0, test);
 	end
 

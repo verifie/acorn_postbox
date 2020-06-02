@@ -2,7 +2,6 @@
 
 TESTS           := $(basename $(wildcard tests/test_*.v))
 TESTRESULTS     := $(addsuffix .lxt2, ${TESTS})
-TESTRESULTS_VCD := $(addsuffix .vcd, ${TESTS})
 
 
 MODULE_V    := postcode.v
@@ -14,9 +13,6 @@ all:
 test: ${TESTRESULTS}
 	@#echo "TODO: Aggregate test results, pass/fail"
 
-testvcd: ${TESTRESULTS_VCD}
-	@#echo "TODO: Aggregate test results, pass/fail"
-
 testclean:
 	rm -f ${TESTRESULTS} ${TESTRESULTS_VCD}
 
@@ -26,15 +22,9 @@ tests/%.lxt2:	tests/%
 	@vvp $< -lxt2
 	@echo
 
-# Run a test to produce the test results
-tests/%.vcd:	tests/%
-	@echo "Running test $<"
-	@vvp $<
-	@echo
-
 # Build the test using Icarus Verilog
 tests/%:	tests/%.v ${MODULE_V} top.v FORCE
-	@iverilog -I./tests -o $@ $< ${MODULE_V} top.v
+	@iverilog -I./tests -o $@ $< ${MODULE_V} post_box_usb.v
 
 .PHONY: FORCE
 

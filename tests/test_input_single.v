@@ -16,7 +16,7 @@ module test;
 
 	// Output waveform file for this test
 	initial begin
-		$dumpfile("tests/test_input_single.vcd");
+		$dumpfile("tests/test_input_single.lxt2");
 		$dumpvars(0, test);
 	end
 
