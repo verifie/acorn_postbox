@@ -110,7 +110,7 @@ module post_box_usb(
                 // reset_in <= spi_mosi_sync[1];
             end else if (spi_counter == 6) begin
                 // Set up shifter, which will
-                if (spi_we_have_a_byte_to_send) begin
+                if (spi_we_have_a_byte_to_send && spi_remote_has_buffer_space) begin
                     spi_shifter <= postcode_rxdata;
                     postcode_rxreset <= 1'b1;
                 end

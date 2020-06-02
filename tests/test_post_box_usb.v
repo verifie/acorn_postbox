@@ -80,6 +80,9 @@ module test;
     reg spi_received_byte;
     reg [7:0] spi_data;
 
+    reg remote_had_byte;
+    reg remote_had_space;
+
     // Input shift register, receives data sent in response to an INPUT req
     reg [7:0] input_sr;
     initial input_sr = 0;
@@ -99,7 +102,7 @@ module test;
         $display("\n### Verify nothing buffered");
         // Nothing should be sent or received here
         // spi_txn(have_byte, have_space, input_byte -> sent_byte, received_byte, output_byte)
-        spi_txn(0, 1, 0, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(0, 1, 0, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         `assert(!spi_sent_byte, "Initial SPI transaction sent a byte");
         `assert(!spi_received_byte, "Initial SPI transaction received a byte");
 
@@ -110,12 +113,24 @@ module test;
         // Now send the byte as series of one and two pulses
         outbyte(8'ha8);
 
-        // Try sending another byte; expect no output-ready
+        $display("\n### Test that attempting to send another byte will fail.");
         pulsebreak(3);
         `assert(lastAck == 1'b0, "Output-ready received right after receiving a byte, when the buffer should be full.");
 
-        // Now we should be able to get the first byte with an SPI transaction
-        spi_txn(0, 1, 0, spi_sent_byte, spi_received_byte, spi_data);
+        $display("\n### Test that we can verify that the byte is there with a null SPI transaction");
+        spi_txn(0, 0, 0, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        `assert(!spi_sent_byte, "SPI transaction unexpectedly sent a byte");
+        `assert(!spi_received_byte, "SPI transaction unexpectedly received a byte");
+        `assert(remote_had_byte, "SPI remote should have a byte available");
+
+        $display("\n### Test that the null SPI transaction didn't clear rxfull");
+        spi_txn(0, 0, 0, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        `assert(!spi_sent_byte, "SPI transaction unexpectedly sent a byte");
+        `assert(!spi_received_byte, "SPI transaction unexpectedly received a byte");
+        `assert(remote_had_byte, "SPI remote should have a byte available");
+
+        $display("\n### Test that we can get the first byte with an SPI transaction");
+        spi_txn(0, 1, 0, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         `assert(!spi_sent_byte, "SPI transaction unexpectedly sent a byte");
         `assert(spi_received_byte, "SPI transaction should have received a byte");
         `assert(spi_data == 8'ha8, "SPI data incorrect; expected a8");
@@ -127,11 +142,11 @@ module test;
 
         $display("\n### Testing that the input accepts a byte over SPI");
         // Make sure the DUT has a byte in its tx buffer (for the next INPUT from the target)
-        spi_txn(1, 1, 0, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(1, 1, 0, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         `assert(spi_sent_byte, "Should have sent a byte to DUT");
 
         $display("\n### Verify that a second byte is not accepted as the tx buffer should not be full");
-        spi_txn(1, 1, 0, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(1, 1, 0, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         `assert(!spi_sent_byte, "DUT tx buffer should be full but sent a byte");
         pulsebreak(12);  // Clear buffer again
 
@@ -140,29 +155,29 @@ module test;
         pulsebreak(12);
 
         $display("\n### Verify that the interface can now accept a new byte (the 12 pulses did clear it)");
-        spi_txn(1, 1, 0, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(1, 1, 0, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         `assert(spi_sent_byte, "Should have sent a byte to DUT");
 
         $display("\n### Send 0x42 over SPI, then expect it to show up over input");
-        spi_txn(1, 1, 8'h42, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(1, 1, 8'h42, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulsebreak(12);
         $display("input shifter: %b (%x)", input_sr, input_sr);
         `assert(input_sr == 8'h42, "Input shifter value incorrect");
 
         $display("\n### Send 0xc3 over SPI, then expect it to show up over input");
-        spi_txn(1, 1, 8'hc3, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(1, 1, 8'hc3, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulsebreak(12);
         $display("input shifter: %b (%x)", input_sr, input_sr);
         `assert(input_sr == 8'hc3, "Input shifter value incorrect");
 
         $display("\n### Test chained input (writes to target): 12, ff, 34");
-        spi_txn(1, 1, 8'h12, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(1, 1, 8'h12, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulse(12);
         `assert(input_sr == 8'h12, "Input shifter value incorrect");
-        spi_txn(1, 1, 8'hff, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(1, 1, 8'hff, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulse(9);
         `assert(input_sr == 8'hff, "Input shifter value incorrect");
-        spi_txn(1, 1, 8'h34, spi_sent_byte, spi_received_byte, spi_data);
+        spi_txn(1, 1, 8'h34, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulse(9);
         `assert(input_sr == 8'h34, "Input shifter value incorrect");
         pulse(1);

@@ -17,14 +17,14 @@
 // For pinPeripheral(), so we can change PINMUX
 #include "wiring_private.h"
 
-// For libxsvf, so we can program the CPLD
+// For libxsvf, so we can program the FPGA
 #include "src/libxsvf/libxsvf.h"
 
-// This code is for an ATSAMD21E18A connected to an acorn_postbox CPLD
+// This code is for an ATSAMD21E18A connected to an acorn_postbox FPGA
 // Functions provided:
 // - USB serial interface for all control
-// - USB SVF+JTAG interface to program the CPLD
-// - CPLD clock generation (2MHz)
+// - USB SVF+JTAG interface to program the FPGA
+// - FPGA clock generation (2MHz)
 
 // Pinout:
 
@@ -34,7 +34,7 @@
 
 // Mapping: A(x) = D(x+14), e.g. A0 = D14 and A10 = D24
 
-// CPLD JTAG port
+// FPGA JTAG port
 
 // PA04 - D24 / A10
 #define TDO_PIN 24
@@ -45,36 +45,27 @@
 // PA07 - D17 / A3
 #define TDI_PIN 17
 
-// CPLD comms
+// FPGA comms
 
-// PA08 / SERCOM2.0 (SERCOM-ALT) - D35 - cpld_MOSI
-#define CPLD_MOSI_PIN 35
-// In slave mode, DI is MOSI
-#define SPI_RX_PAD SERCOM_RX_PAD_0
-// PA09 / SERCOM2.1 (SERCOM-ALT) - D23 - cpld_SCK
-#define CPLD_SCK_PIN 23
-// PA14 / SERCOM2.2 (just SERCOM, not ALT) - D5 - cpld_SS
-#define CPLD_SS_PIN 5
-// PA15 / SERCOM2.3 (just SERCOM, not ALT) - D7 - cpld_MISO
-#define CPLD_MISO_PIN 7
-// In slave mode, DO is MISO
-#define SPI_TX_PAD SPI_PAD_3_SCK_1
+// PA08 / SERCOM2.0 (SERCOM-ALT) - D35 - FPGA_MOSI
+#define FPGA_MOSI_PIN 35
+// In master mode, DO is MOSI
+#define SPI_TX_PAD SPI_PAD_0_SCK_1
+// PA09 / SERCOM2.1 (SERCOM-ALT) - D23 - FPGA_SCK
+#define FPGA_SCK_PIN 23
+// PA14 / SERCOM2.2 (just SERCOM, not ALT) - D5 - FPGA_SS
+#define FPGA_SS_PIN 5
+// PA15 / SERCOM2.3 (just SERCOM, not ALT) - D7 - FPGA_MISO
+#define FPGA_MISO_PIN 7
+// In master mode, DI is MISO
+#define SPI_RX_PAD SERCOM_RX_PAD_3
 
-// PA10 - D34 - 2MHz clock out
-#define CLOCK_2MHZ_PIN 34
-// PA11 - D22 - rx_ready
-#define RX_READY_PIN 22
-// PA16 (MCU pin 17) - tx_pending
-// This is shown as pin 11 in the comment at the top of circuitplay/variant.cpp,
-// but is pin 30 in g_APinDescription.
-#define TX_PENDING_PIN 30
-// PA17 (MCU pin 18) - want_tx
-// Unfortunately this is also the LED pin, so the bootloader might conflict with the CPLD here
-#define WANT_TX_PIN 13
+// PA10 - D34 - 48MHz clock out
+#define CLOCK_48MHZ_PIN 34
+// PA11 - D22 - target powered
+#define TARGET_POWER_PIN 22
 // PA28 (MCU pin 27) - reset_in
 #define TARGET_RESET_PIN 4
-// PA02 (MCU pin ?) - transaction direction (0 = output from target, 1 = input to target)
-#define LAST_TRANSACTION_WAS_INPUT_PIN 12
 
 // Uncomment this to show every byte sent and received over SPI
 // #define SHOW_ALL_SPI_TRANSFERS
@@ -83,8 +74,8 @@
 // libxsvf (xsvftool-arduino) entry point
 extern void arduino_play_svf(int tms_pin, int tdi_pin, int tdo_pin, int tck_pin, int trst_pin);
 
-// SPI on SERCOM2 to talk to the CPLD at 24MHz
-SPIClass cpld_spi(&sercom2, CPLD_MISO_PIN, CPLD_SCK_PIN, CPLD_MOSI_PIN, SPI_TX_PAD, SPI_RX_PAD);
+// SPI on SERCOM2 to talk to the FPGA at 8MHz
+SPIClass fpga_spi(&sercom2, FPGA_MISO_PIN, FPGA_SCK_PIN, FPGA_MOSI_PIN, SPI_TX_PAD, SPI_RX_PAD);
 
 enum {
   WAITING_FOR_READY_BYTE = 0,
@@ -131,28 +122,29 @@ void DAC_Handler      (void) { __BKPT(3); }
 void PTC_Handler      (void) { __BKPT(3); }
 void I2S_Handler      (void) { __BKPT(3); }
 
-// Set MOSI/SCK/MISO/SS pins up for SPI comms with CPLD.
+// Set MOSI/SCK/MISO/SS pins up for SPI comms with FPGA
 void select_spi() {
-  cpld_spi.begin();
+  fpga_spi.begin();
   sercom2.disableSPI();  // disable SERCOM so we can write registers.
 
-  // Now reconfigure in slave mode.
-  SERCOM2->SPI.CTRLA.reg = SERCOM_SPI_CTRLA_MODE_SPI_SLAVE |
+  // Now reconfigure in master mode.
+  SERCOM2->SPI.CTRLA.reg = SERCOM_SPI_CTRLA_MODE_SPI_MASTER |
                            SERCOM_SPI_CTRLA_DOPO(SPI_TX_PAD) |
                            SERCOM_SPI_CTRLA_DIPO(SPI_RX_PAD) |
                            MSB_FIRST << SERCOM_SPI_CTRLA_DORD_Pos;
 
   SERCOM2->SPI.CTRLB.reg = SERCOM_SPI_CTRLB_RXEN |
-                           SERCOM_SPI_CTRLB_PLOADEN |  // Allow slave preload
                            SERCOM_SPI_CTRLB_CHSIZE(SPI_CHAR_SIZE_8_BITS);
 
 
-  // cpld_spi.begin() doesn't get these right, as there are two SERCOM options
+  // fpga_spi.begin() doesn't get these right, as there are two SERCOM options
   // for these pins.
-  pinPeripheral(CPLD_MOSI_PIN, PIO_SERCOM_ALT);
-  pinPeripheral(CPLD_SCK_PIN, PIO_SERCOM_ALT);
-  pinPeripheral(CPLD_MISO_PIN, PIO_SERCOM);  // just PIO_SERCOM as PA11 is now rx_ready
-  pinPeripheral(CPLD_SS_PIN, PIO_SERCOM);    // just PIO_SERCOM as PA10 is now 2MHz
+  pinPeripheral(FPGA_MOSI_PIN, PIO_SERCOM_ALT);
+  pinPeripheral(FPGA_SCK_PIN, PIO_SERCOM_ALT);
+  pinPeripheral(FPGA_MISO_PIN, PIO_SERCOM);
+  // pinPeripheral(FPGA_SS_PIN, PIO_SERCOM);
+  pinMode(FPGA_SS_PIN, OUTPUT);
+  digitalWrite(FPGA_SS_PIN, HIGH);
 
   // And start it up again!
   sercom2.enableSPI();
@@ -164,12 +156,12 @@ void select_spi() {
                               SERCOM_SPI_INTENCLR_TXC |
                               SERCOM_SPI_INTENCLR_DRE;
 
-  // Don't call cpld_spi.beginTransaction, as that will switch back to master mode.
+  // Don't call fpga_spi.beginTransaction, as that will switch back to master mode.
 }
 
 // Send/receive a byte over SPI, optionally dumping details to the serial port.
 uint8_t spi_transfer(uint8_t b) {
-  uint8_t r = cpld_spi.transfer(b);
+  uint8_t r = fpga_spi.transfer(b);
 #ifdef SHOW_ALL_SPI_TRANSFERS
   Serial.print("[");
   Serial.print(b, HEX);
@@ -213,21 +205,14 @@ void setup() {
   sercom5.resetUART();
 
   // Set up our GPIOs
-  pinMode(RX_READY_PIN, OUTPUT);
-  digitalWrite(RX_READY_PIN, HIGH);
-  digitalWrite(RX_READY_PIN, LOW);
-
-  pinMode(TX_PENDING_PIN, OUTPUT);
-  digitalWrite(TX_PENDING_PIN, LOW);
-
-  pinMode(WANT_TX_PIN, INPUT);
+  // pinMode(TARGET_POWERED_PIN, INPUT);
 
   pinMode(TARGET_RESET_PIN, OUTPUT);
   digitalWrite(TARGET_RESET_PIN, LOW);
 
-  // Output 2MHz clock for CPLD
-  // DIV=2 gives 24MHz, so DIV=24 is probably what we want
-  GCLK->GENDIV.reg = GCLK_GENDIV_ID(4) | GCLK_GENDIV_DIV(24);
+  // Output 48MHz clock for FPGA
+  // DIV=2 gives 24MHz, so DIV=1 is probably what we want
+  GCLK->GENDIV.reg = GCLK_GENDIV_ID(4) | GCLK_GENDIV_DIV(1);
   while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
 
   GCLK->GENCTRL.reg = GCLK_GENCTRL_ID(4) |
@@ -238,9 +223,10 @@ void setup() {
   while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
 
   // enable GCLK_IO[4] on PA10
-  pinPeripheral(CLOCK_2MHZ_PIN, PIO_AC_CLK);
+  pinPeripheral(CLOCK_48MHZ_PIN, PIO_AC_CLK);
 
-  // Set pin directions for CPLD JTAG.
+#ifdef ENABLE_JTAG
+  // Set pin directions for FPGA JTAG.
   pinMode(TDO_PIN, INPUT);
   pinMode(TDI_PIN, OUTPUT);
   digitalWrite(TDI_PIN, HIGH);
@@ -248,6 +234,13 @@ void setup() {
   digitalWrite(TMS_PIN, HIGH);
   pinMode(TCK_PIN, OUTPUT);
   digitalWrite(TCK_PIN, LOW);
+#else  // !ENABLE_JTAG
+  // JTAG disabled so we don't conflict with a plugged-in programmer
+  pinMode(TDO_PIN, INPUT);
+  pinMode(TDI_PIN, INPUT);
+  pinMode(TMS_PIN, INPUT);
+  pinMode(TCK_PIN, INPUT);
+#endif
 
   // Set up USB serial port
   Serial.begin(9600);
@@ -299,62 +292,58 @@ bool have_buffered_rx_byte = false;
 uint8_t buffered_rx_byte = 0;
 bool last_transaction_was_input = false;
 
+// Return true if the target has a byte for us to receive
 bool target_available() {
-  // Do we have a byte already?
-  if (have_buffered_rx_byte) return true;
-
-  // If nothing is waiting for us, pulse RX_READY, to make sure the CPLD knows
-  // we want data.
-  if (!SERCOM2->SPI.INTFLAG.bit.RXC) {
-    digitalWrite(RX_READY_PIN, HIGH);
-    digitalWrite(RX_READY_PIN, LOW);
-  }
-
-  // Handle any incoming bytes.
-  if (!SERCOM2->SPI.INTFLAG.bit.RXC) {
-    return false;
-  }
-
-  // Read byte from SPI.
-  if (SERCOM2->SPI.STATUS.bit.BUFOVF) {
-    Serial.println("<input overflow!>");
-    SERCOM2->SPI.STATUS.bit.BUFOVF = 1;  // Clear BUFOVF
-  }
-  uint8_t b = SERCOM2->SPI.DATA.bit.DATA;
-  last_transaction_was_input = !!digitalRead(LAST_TRANSACTION_WAS_INPUT_PIN);
-
-  // Indicate to CPLD that we have room for another one.
-  digitalWrite(RX_READY_PIN, HIGH);
-  digitalWrite(RX_READY_PIN, LOW);
-
-  // And buffer our new byte
-  have_buffered_rx_byte = true;
-  buffered_rx_byte = b;
-  return true;
+  digitalWrite(FPGA_SS_PIN, LOW);
+  uint8_t fpga_status = spi_transfer(0);  // nothing to send, no buffer space
+  digitalWrite(FPGA_SS_PIN, HIGH);
+  return (fpga_status & 0x80) == 0x80;  // FPGA has a byte to send
 }
 
-uint8_t target_readbyte() {
+// Read a byte if available, returning -1 if the FPGA doesn't have a byte to send
+int target_readbyte() {
+  digitalWrite(FPGA_SS_PIN, LOW);
+  uint8_t fpga_status = spi_transfer(0x40);  // nothing to send, but have buffer space
+  if (!(fpga_status & 0x80)) return -1;  // FPGA has nothing to send
+  uint8_t b = spi_transfer(0);
+  digitalWrite(FPGA_SS_PIN, HIGH);
+  return b;
+}
+
+// Wait up to 500 ms to read a byte, returning -1 if the FPGA doesn't send anything before we time out
+int target_readbyte_block() {
   long start_ts = millis();
-  while (!target_available()) {
-    if (check_disconnect()) {
-      return 0;
-    }
-    if (millis() - start_ts > 5000) {
-      Serial.println("target_readbyte timeout");
-      return 0;
+  while (1) {
+    int b = target_readbyte();
+    if (b != -1) return (uint8_t)(b & 0xFF);
+    if (millis() - start_ts > 500) {
+      Serial.println("Timeout waiting for remote to send a byte");
+      return -1;
     }
   }
-  have_buffered_rx_byte = false;
-  return buffered_rx_byte;
 }
 
 uint32_t target_input_checksum = 0;
 
+// Read four bytes from the target.
+// TODO make this return something more useful than (uint32_t)(-1) on failure
 uint32_t target_readword() {
-  uint32_t w = (uint32_t)target_readbyte();
-  w = (w << 8) | (uint32_t)target_readbyte();
-  w = (w << 8) | (uint32_t)target_readbyte();
-  w = (w << 8) | (uint32_t)target_readbyte();
+  int b = target_readbyte_block();
+  if (b < 0) return b;
+  uint32_t w = (uint32_t)b;
+
+  b = target_readbyte_block();
+  if (b < 0) return b;
+  w = (w << 8) | (uint32_t)b;
+
+  b = target_readbyte_block();
+  if (b < 0) return b;
+  w = (w << 8) | (uint32_t)b;
+
+  b = target_readbyte_block();
+  if (b < 0) return b;
+  w = (w << 8) | (uint32_t)b;
+
   target_input_checksum += w;
   return w;
 }
@@ -374,77 +363,33 @@ void target_verify_input_checksum() {
   }
 }
 
-void target_sendbyte_internal(uint8_t b) {
-  SERCOM2->SPI.DATA.bit.DATA = b;
-  digitalWrite(TX_PENDING_PIN, HIGH);
-  digitalWrite(TX_PENDING_PIN, LOW);
-}
-
 int target_sendbyte(uint8_t b) {
   // Buffer should always be empty before a sendbyte call
-  if (target_available()) {
+  int rx_byte = target_readbyte();
+  if (rx_byte != -1) {
     Serial.print("(");
-    Serial.print(target_readbyte(), HEX);
+    Serial.print((uint8_t)rx_byte, HEX);
     Serial.print("!)");
   }
 
   Serial.print(">");
   Serial.print(b, HEX);
 
-  // long start_ts = millis();
-  // do {
-  //   // Pick up any byte in the buffer, because we'll get another one from the
-  //   // tx transaction.
-  //   if (target_available() && SERCOM2->SPI.INTFLAG.bit.RXC) {
-  //     uint8_t b = target_readbyte();
-  //     // Serial.print("ERROR: target_sendbyte() dropped byte 0x");
-  //     Serial.print(b, HEX);
-  //     Serial.print("!");
-  //     // Serial.println(" waiting in the buffer.");
-  //   }
-  //   if (millis() - start_ts > 30) {
-  //     Serial.println("Timeout waiting for ")
-  //   }
-  //   // TODO timeout here
-  // } while (just_sent_a_byte ||
-  //   !digitalRead(WANT_TX_PIN));
-
   long start_ts = millis();
-  while (!digitalRead(WANT_TX_PIN)) {
+  while (1) {
+    digitalWrite(FPGA_SS_PIN, LOW);
+    uint8_t fpga_status = spi_transfer(0x80);  // We have a byte to write, but no buffer space
+    if (fpga_status & 0x40) break;  // FPGA is ready for our byte
     if (millis() - start_ts > 500) {
-      Serial.println("Send timeout");
+      digitalWrite(FPGA_SS_PIN, HIGH);
+      Serial.println("Timeout waiting for remote to accept a byte");
       return -1;
     }
   }
 
-  target_sendbyte_internal(b);
-  // just_sent_a_byte = true;  // DEBUG: setting this may be causing hangs
-  // last_byte_sent = b;
-  // if (target_available()) {
-  //   Serial.println("Send ack too soon?");
-  // }
-
-  // Now verify that the byte was sent
-  start_ts = millis();
-  while (!target_available()) {
-    if (millis() - start_ts > 500) {
-      Serial.println("Send ack timeout");
-      return -1;
-    }
-  }
-
-  // Read ack byte (should be zero)
-  if (!last_transaction_was_input) {
-    Serial.println("Serial mismatch: sendbyte saw output transaction");
-    return -1;
-  }
-
-  uint8_t r = target_readbyte();
-  if (r != 0) {
-    Serial.print("Serial bad ack ");
-    Serial.println(r, HEX);
-    return -2;
-  }
+  // Now send the byte
+  (void)spi_transfer(b);
+  digitalWrite(FPGA_SS_PIN, HIGH);
 
   return 0;
 }
@@ -477,20 +422,14 @@ int target_send_checksum() {
 int target_wait_ready() {
   // wait for 0x90 byte
   while (1) {
-    long start_ts = millis();
     bool want_tx = false;
-    while (!target_available()) {
-      if (check_disconnect()) return -1;
-      if (digitalRead(WANT_TX_PIN) && !want_tx) {
-        Serial.println("Target wants data -- maybe ready?");
-        want_tx = true;
-      }
-      if (millis() - start_ts > 500) {
-        Serial.println("Timeout in wait_ready");
-        return -2;
-      }
+    int b = target_readbyte_block();
+    if (b < 0) {
+      Serial.println("Timeout in wait_ready");
+      return -2;
     }
-    uint8_t b = target_readbyte();
+    if (check_disconnect()) return -1;
+
     Serial.print("<");
     Serial.print(b, HEX);
     Serial.print(">");
@@ -658,9 +597,9 @@ void loop() {
     // Serial port is actually open.
   }
 
-  if (target_available()) {
-    uint8_t b = target_readbyte();
-
+  int i = target_readbyte();
+  if (i >= 0) {
+    uint8_t b = (uint8_t)i;
     // Not proxying POST output; data received between commands
     Serial.print("[");
     Serial.print(b, HEX);
@@ -674,22 +613,15 @@ void loop() {
     }
   }
 
-  bool want_tx = digitalRead(WANT_TX_PIN) ? true : false;
-  if (want_tx != last_want_tx) {
-    last_want_tx = want_tx;
-    if (want_tx && !target_started) {
-      Serial.println("Target not yet started; ignoring tx request");
-    }
-  }
-
   if (Serial.available()) {
     int c = Serial.read();
     switch (c) {
       case 'C': {
-        // program CPLD
-        Serial.println("SEND SVF");
-        arduino_play_svf(TMS_PIN, TDI_PIN, TDO_PIN, TCK_PIN, -1);
-        Serial.println("SVF DONE");
+        // program FPGA
+        Serial.println("TODO implement FPGA programming");
+        // Serial.println("SEND SVF");
+        // arduino_play_svf(TMS_PIN, TDI_PIN, TDO_PIN, TCK_PIN, -1);
+        // Serial.println("SVF DONE");
         break;
       }
       case 's': {
@@ -707,13 +639,9 @@ void loop() {
         Serial.println("LCD mode - Monitoring POST output:");
         target_sendbyte(0);
         while (1) {
-          // if (digitalRead(WANT_TX_PIN)) {
-          //   // In case we get spurious pulses on want_tx, just fire and forget here
-          //   // (and ignore all zeros on incoming data)
-          //   target_sendbyte_internal(0);
-          // }
-          if (target_available()) {
-            uint8_t b = target_readbyte();
+          int i = target_readbyte();
+          if (i >= 0) {
+            uint8_t b = (uint8_t)i;
             // Serial.print("[");
             // Serial.print(b, HEX);
             // Serial.print("]");

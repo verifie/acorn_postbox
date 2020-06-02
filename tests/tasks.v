@@ -68,6 +68,9 @@ task spi_txn;
 	output received_byte;
 	output [7:0] output_byte;  // byte output by target
 
+	output remote_had_byte;
+	output remote_had_space;
+
 	reg [15:0] sr;
 
 	begin
@@ -88,8 +91,10 @@ task spi_txn;
 		spi_cs = 1'b1;
 		#SPIGAP;  // Delay so back to back spi_txn calls don't merge into one
 
-		sent_byte = have_byte && sr[14];  // we had a byte to send, and the remote had space
-		received_byte = have_buffer_space && sr[15];  // remote had a byte to send, and we had space
+		remote_had_space = sr[14];
+		sent_byte = have_byte && remote_had_space;  // we had a byte to send, and the remote had space
+		remote_had_byte = sr[15];
+		received_byte = have_buffer_space && remote_had_byte;  // remote had a byte to send, and we had space
 		output_byte = sr[7:0];  // byte output by target / sent from DUT to us over SPI
 
 		$display("Test SPI: have_byte %d have_buffer_space %d input_byte %02x -> sent_byte %d received_byte %d output_byte %02x",
