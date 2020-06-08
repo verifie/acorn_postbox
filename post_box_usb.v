@@ -31,11 +31,12 @@ module post_box_usb(
     output hotswap_noe          // /OE for 74LCX125 buffer
 );
 
+    reg target_power_out_int = 1'b0;
+    assign target_power_out = target_power_out_int;
+
     assign hotswap_noe = 1'b0;  // Enable hotswap buffer whenever FPGA is powered
 
     assign target_reset_noe = reset_in ? 1'b0 : 1'b1;  // reset is driven low when target_reset_noe==0
-
-    assign target_power_out = target_power_3v;
 
     wire testack_int;
     assign testack_noe = testack_int ? 1'b0 : 1'b1;  // testack is driven high when testack_noe==0
@@ -81,6 +82,11 @@ module post_box_usb(
     );
 
     always @(posedge fpga_clock_48mhz) begin
+        // For some reason I'm getting these warnings here; is target_power_3v unconnected externally?
+        // WARNING - synthesis: I/O Port target_power_out 's net has no driver and is unused.
+        // WARNING - synthesis: I/O Port target_power_3v 's net has no driver and is unused.
+        target_power_out_int <= target_power_3v;
+
         spi_cs_sync <= {spi_cs_sync[1:0], fpga_spi_cs};
         spi_sck_sync <= {spi_sck_sync[1:0], fpga_spi_sck};
         spi_mosi_sync <= {spi_mosi_sync[1:0], fpga_spi_mosi};
