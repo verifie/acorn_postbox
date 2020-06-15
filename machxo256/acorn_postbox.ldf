@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BaliProject version="3.2" title="acorn_postbox" device="LCMXO256C-3T100C" default_implementation="impl1">
+    <Options/>
+    <Implementation title="impl1" dir="impl1" description="impl1" synthesis="lse" default_strategy="Strategy1">
+        <Options def_top="post_box_usb"/>
+        <Source name="../postcode.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../post_box_usb.v" type="Verilog" type_short="Verilog">
+            <Options top_module="post_box_usb"/>
+        </Source>
+        <Source name="acorn_postbox.ldc" type="LSE Design Constraints File" type_short="LDC">
+            <Options/>
+        </Source>
+        <Source name="acorn_postbox.lpf" type="Logic Preference" type_short="LPF">
+            <Options/>
+        </Source>
+        <Source name="impl1/impl1.xcf" type="Programming Project File" type_short="Programming">
+            <Options/>
+        </Source>
+    </Implementation>
+    <Strategy name="Strategy1" file="acorn_postbox1.sty"/>
+</BaliProject>
