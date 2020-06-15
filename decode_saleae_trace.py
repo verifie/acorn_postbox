@@ -16,6 +16,7 @@ class Processor:
         self.line_so_far = ''
 
     def decode_pulses(self, fn):
+        print("Decoding pulses from %s" % fn)
         f = open(fn)
 
         headings = f.readline().split(",")
@@ -90,6 +91,7 @@ class Processor:
             self.last_byte = shifter
 
     def decode_chars(self, fn):
+        print("Decoding chars from %s" % fn)
         for line in open(fn, 'rt'):
             #print line.strip()
             m = re.search(r'\(0x(..)\)', line)

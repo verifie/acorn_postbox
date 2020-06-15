@@ -13,6 +13,10 @@
 //  6: 0V
 
 module post_box_usb(
+    // Test things
+    output fpga_GPIO34,
+    output fpga_GPIO35,
+    
     // Connections to microcontroller
     input  fpga_clock_48mhz,    // 48 MHz clock from MCU PA10
     input  reset_in,            // 1 to reset the target machine
@@ -31,6 +35,13 @@ module post_box_usb(
     output hotswap_noe          // /OE for 74LCX125 buffer
 );
 
+// `ifdef SYNTHESIS
+//  wire osc_int;
+//  OSCC OSCInst0 (.OSC(osc_int));
+//     assign fpga_GPIO35 = osc_int;
+//     assign fpga_GPIO34 = fpga_clock_48mhz;
+// `endif
+
     reg target_power_out_int = 1'b0;
     assign target_power_out = target_power_out_int;
 
@@ -40,6 +51,11 @@ module post_box_usb(
 
     wire testack_int;
     assign testack_noe = testack_int ? 1'b0 : 1'b1;  // testack is driven high when testack_noe==0
+
+    // these two are ultra glitchy when scoped at the archimedes end; let's see
+    // if they're any better from the POV of the FPGA
+    assign fpga_GPIO35 = testreq_3v;
+    assign fpga_GPIO34 = testack_int;
 
     reg spi_miso_int = 1'b1;
     assign fpga_spi_miso = spi_miso_int;
@@ -125,7 +141,6 @@ module post_box_usb(
                 spi_shifter <= {spi_shifter[6:0], spi_mosi_sync[1]};
                 if (spi_counter == 15) begin
                     if (spi_remote_has_a_byte_to_send && spi_we_have_buffer_space) begin
-                        // TODO pass byte to postcode
                         postcode_txstart <= 1'b1;
                     end
                 end

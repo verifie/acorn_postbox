@@ -26,6 +26,8 @@ tests/%.lxt2:	tests/%
 tests/%:	tests/%.v ${MODULE_V} top.v FORCE
 	@iverilog -I./tests -o $@ $< ${MODULE_V} post_box_usb.v
 
+test_post_box_usb: tests/test_post_box_usb.lxt2
+
 .PHONY: FORCE
 
 FORCE:

@@ -83,6 +83,7 @@ module postcode
 
         // Accept new byte from host
         if (txstart && !txbuf_full) begin
+            $display("postcode: Accept new byte %02x", txin);
             txbuf <= txin;
             txbuf_full <= 1'b1;
         end
@@ -156,6 +157,9 @@ module postcode
                         // If this is all, the target is starting a byte
                         state <= S_OUTPUTPOLL;
 
+                        // Always reset the count of received bits when we see a third pulse.
+                        rxcounter <= 4'b0;
+
                         // If NACK (rx_ready == 0, no ACK pulse) then the target will delay,
                         // then send another 3-pulse POLL.
                         //
@@ -175,6 +179,13 @@ module postcode
                         // Send the TX Ready flag then go to S_INPUTPOLL
                         testack_int <= txbuf_full;
                         state <= S_INPUTPOLL;
+                        if (txbuf_full) begin
+                            // Load the shift register
+                            txshift <= txbuf;
+                            $display("postcode: Load input/tx shifter with %02x", txbuf);
+                            // Ready to accept another byte from the host to transmit to the target
+                            txbuf_full <= 1'b0;
+                        end
                         $display("Pulse 4: txbuf_full = %d", txbuf_full);
                     end
 
@@ -187,16 +198,17 @@ module postcode
 
                         if (!testack_int) begin
                             testack_int <= txbuf_full;
+                            if (txbuf_full) begin
+                                // Load the shift register
+                                txshift <= txbuf;
+                                // Ready to accept another byte from the host to transmit to the target
+                                txbuf_full <= 1'b0;
+                            end
                         end else begin
                             // We acked the last pulse, so we're ready
-                            state <= S_INPUT_BIT7;
                             $display("Pulse 4: send bit 7");
                             // Latch the transmit data and send the ACK
-                            testack_int <= txin[7];
-                            // Load the shift register
-                            txshift <= txin;
-                            // Ready to accept another byte from the host to transmit to the target
-                            txbuf_full <= 1'b0;
+                            testack_int <= txshift[7];
                             // Advance to next state
                             state <= S_INPUT_BIT7;
                         end
@@ -248,6 +260,12 @@ module postcode
                         $display("Pulse 13: target is requesting another byte; txbuf_full=%d", txbuf_full);
                         testack_int <= txbuf_full;
                         state <= S_INPUTPOLL;
+                        if (txbuf_full) begin
+                            // Load the shift register
+                            txshift <= txbuf;
+                            // Ready to accept another byte from the host to transmit to the target
+                            txbuf_full <= 1'b0;
+                        end
                     end
 
                     default: begin

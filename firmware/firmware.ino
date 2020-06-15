@@ -60,11 +60,11 @@
 // In master mode, DI is MISO
 #define SPI_RX_PAD SERCOM_RX_PAD_3
 
-// PA10 - D34 - 48MHz clock out
+// PA10 - D34 - 48MHz clock out (output)
 #define CLOCK_48MHZ_PIN 34
-// PA11 - D22 - target powered
+// PA11 - D22 - target powered (input)
 #define TARGET_POWER_PIN 22
-// PA28 (MCU pin 27) - reset_in
+// PA28 (MCU pin 27) - reset_in (output)
 #define TARGET_RESET_PIN 4
 
 // Uncomment this to show every byte sent and received over SPI
@@ -125,6 +125,7 @@ void I2S_Handler      (void) { __BKPT(3); }
 // Set MOSI/SCK/MISO/SS pins up for SPI comms with FPGA
 void select_spi() {
   fpga_spi.begin();
+  fpga_spi.beginTransaction(SPISettings(4000000L, MSBFIRST, SPI_MODE0));
   sercom2.disableSPI();  // disable SERCOM so we can write registers.
 
   // Now reconfigure in master mode.
@@ -304,10 +305,15 @@ bool target_available() {
 int target_readbyte() {
   digitalWrite(FPGA_SS_PIN, LOW);
   uint8_t fpga_status = spi_transfer(0x40);  // nothing to send, but have buffer space
-  if (!(fpga_status & 0x80)) return -1;  // FPGA has nothing to send
-  uint8_t b = spi_transfer(0);
+  int r = -1;  // FPGA has nothing to send
+  if (fpga_status & 0x80) {
+    r = spi_transfer(0);
+    // Serial.print("<");
+    // Serial.print((uint8_t)r, HEX);
+    // Serial.print(">");
+  }
   digitalWrite(FPGA_SS_PIN, HIGH);
-  return b;
+  return r;
 }
 
 // Wait up to 500 ms to read a byte, returning -1 if the FPGA doesn't send anything before we time out
@@ -327,21 +333,23 @@ uint32_t target_input_checksum = 0;
 
 // Read four bytes from the target.
 // TODO make this return something more useful than (uint32_t)(-1) on failure
-uint32_t target_readword() {
+uint32_t target_readword(int* status) {
+  if (status) *status = 0;
+
   int b = target_readbyte_block();
-  if (b < 0) return b;
+  if (b < 0) { if (status) *status = -1; return b; }
   uint32_t w = (uint32_t)b;
 
   b = target_readbyte_block();
-  if (b < 0) return b;
+  if (b < 0) { if (status) *status = -1; return b; }
   w = (w << 8) | (uint32_t)b;
 
   b = target_readbyte_block();
-  if (b < 0) return b;
+  if (b < 0) { if (status) *status = -1; return b; }
   w = (w << 8) | (uint32_t)b;
 
   b = target_readbyte_block();
-  if (b < 0) return b;
+  if (b < 0) { if (status) *status = -1; return b; }
   w = (w << 8) | (uint32_t)b;
 
   target_input_checksum += w;
@@ -353,7 +361,12 @@ void target_reset_input_checksum() {
 }
 
 void target_verify_input_checksum() {
-  uint32_t cs = target_readword();
+  int status = 0;
+  uint32_t cs = target_readword(&status);
+  if (status < 0) {
+    Serial.print("ERROR reading checksum word");
+    return;
+  }
   Serial.print("read cs ");
   Serial.print(cs, HEX);
   Serial.print(" and sum is ");
@@ -364,6 +377,20 @@ void target_verify_input_checksum() {
 }
 
 int target_sendbyte(uint8_t b) {
+  digitalWrite(FPGA_SS_PIN, LOW);
+  uint8_t fpga_status = spi_transfer(0x80);  // We have a byte to write, but no buffer space
+  bool sent = false;
+  if (fpga_status & 0x40) {
+    // Now send the byte
+    (void)spi_transfer(b);
+    sent = true;
+  }
+  digitalWrite(FPGA_SS_PIN, HIGH);
+
+  return sent ? 0 : -1;
+}
+
+int target_sendbyte_block(uint8_t b) {
   // Buffer should always be empty before a sendbyte call
   int rx_byte = target_readbyte();
   if (rx_byte != -1) {
@@ -401,13 +428,13 @@ void target_reset_checksum() {
 }
 
 int target_sendword(uint32_t w) {
-  int r = target_sendbyte((uint8_t)((w & (uint32_t)0xff000000) >> 24));
+  int r = target_sendbyte_block((uint8_t)((w & (uint32_t)0xff000000) >> 24));
   if (r < 0) return r;
-  r = target_sendbyte((uint8_t)((w & (uint32_t)0xff0000) >> 16));
+  r = target_sendbyte_block((uint8_t)((w & (uint32_t)0xff0000) >> 16));
   if (r < 0) return r;
-  r = target_sendbyte((uint8_t)((w & (uint32_t)0xff00) >> 8));
+  r = target_sendbyte_block((uint8_t)((w & (uint32_t)0xff00) >> 8));
   if (r < 0) return r;
-  r = target_sendbyte((uint8_t)((w & (uint32_t)0xff)));
+  r = target_sendbyte_block((uint8_t)((w & (uint32_t)0xff)));
   if (r < 0) return r;
   target_checksum += w;
   return 0;
@@ -440,7 +467,7 @@ int target_wait_ready() {
 uint8_t last_command = 0;
 int target_start_command(uint8_t command) {
   last_command = command;
-  int r = target_sendbyte(command);
+  int r = target_sendbyte_block(command);
   if (r < 0) return r;
   target_reset_checksum();
   return 0;
@@ -450,7 +477,9 @@ int target_finish_command() {
   int r = target_send_checksum();
   if (r < 0) return r;
   Serial.print("Response: ");
-  uint8_t b = target_readbyte();
+  r = target_readbyte_block();
+  if (r < 0) return r;
+  uint8_t b = (uint8_t)r;
   Serial.print(b, HEX);
   if (b == 0xff) {
     Serial.println(" - Checksum error");
@@ -534,13 +563,18 @@ int read_words_from_memory(uint32_t start_addr, uint32_t n_words) {
   CR(target_sendword(n_words));
   CR(target_sendword(start_addr));
   CR(target_finish_command());
-  uint32_t start_addr_confirmation = target_readword();
+  uint32_t start_addr_confirmation = target_readword(NULL);
   target_reset_input_checksum();
   Serial.print("End addr: ");
   Serial.println(start_addr_confirmation, HEX);
+  Serial.println("START DATA");
   for (uint32_t i = 0; i < n_words; ++i) {
-    Serial.println(target_readword(), HEX);
+    int status;
+    Serial.println(target_readword(&status), HEX);
+    if (status < 0) return status;
+    if (check_disconnect()) return -1;
   }
+  Serial.println("END DATA");
   target_verify_input_checksum();
   return 0;
 }
@@ -551,7 +585,7 @@ int write_word_to_memory(uint32_t addr, uint32_t data) {
   CR(target_sendword(addr));
   CR(target_sendword(data));
   CR(target_finish_command());
-  uint32_t cs = target_readword();
+  uint32_t cs = target_readword(NULL);
   CR(target_wait_ready());
 }
 
@@ -589,6 +623,7 @@ void loop() {
     Serial.print(SystemCoreClock);
     Serial.println(" MHz");
     serial_active = 2;
+    machine = ARCHIMEDES;
 
     target_reset();
 
@@ -635,9 +670,33 @@ void loop() {
         target_reset();
         break;
       }
+      case '*': {
+        // Passthrough mode
+        target_reset();
+        Serial.println("Enter passthrough mode");
+        int byte_to_send = -1;
+        while (1) {
+          if (check_disconnect()) break;
+          if (Serial.availableForWrite()) {
+            int i = target_readbyte();
+            if (i >= 0) {
+              // Serial.println(i, HEX);
+              Serial.write((uint8_t)i);
+            }
+          }
+          if (byte_to_send != -1) {
+            int r = target_sendbyte((uint8_t)byte_to_send);
+            if (r == 0) byte_to_send = 0;
+          }
+          if (byte_to_send == -1 && Serial.available()) {
+            byte_to_send = Serial.read();
+          }
+        }
+        break;
+      }
       case 'p': {
         Serial.println("LCD mode - Monitoring POST output:");
-        target_sendbyte(0);
+        target_sendbyte_block(0);
         while (1) {
           int i = target_readbyte();
           if (i >= 0) {
@@ -693,14 +752,17 @@ void loop() {
       case 'R': {
         Serial.println("Reading ROM data");
         uint32_t rom_start = (machine == ARCHIMEDES) ? 0x3800000 : 0;
-        read_words_from_memory(rom_start, 8 * 1024 * 1024);
+        read_words_from_memory(rom_start, 8 * 1024 * 1024 / 4);
         break;
       }
       case 'r': {
         Serial.println("Reading from RAM");
         uint32_t ram_start = (machine == ARCHIMEDES) ? 0x2000000 : 0x18000000;  // A7000 soldered RAM
         read_words_from_memory(ram_start, 16);
+        if (target_readbyte_block() != 0x90) break;
         read_words_from_memory(ram_start + 1024 * 1024, 16);
+        if (target_readbyte_block() != 0x90) break;
+        Serial.println("RAM read successful");
         break;
       }
       case 'W': {
@@ -720,7 +782,7 @@ void loop() {
             CB(target_sendword(random_data));
           }
           CB(target_finish_command());
-          uint32_t cs = target_readword();
+          uint32_t cs = target_readword(NULL);
           CB(target_wait_ready());
         }
         break;
@@ -789,7 +851,7 @@ void loop() {
       }
       // case 'x': {
       //   Serial.println("Execute");
-      //   target_sendbyte(0x18);
+      //   target_sendbyte_block(0x18);
       //   target_reset_checksum();
       //   CB(target_sendword(0x3801b10));  // movs pc, r14 in RISC OS 3.11
       //   CB(target_finish_command());
