@@ -10,3 +10,5 @@ build.log
 db/
 incremental_db/
 output_files/
+__pycache__/
+*.rom

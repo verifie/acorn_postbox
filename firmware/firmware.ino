@@ -686,7 +686,7 @@ void loop() {
           }
           if (byte_to_send != -1) {
             int r = target_sendbyte((uint8_t)byte_to_send);
-            if (r == 0) byte_to_send = 0;
+            if (r == 0) byte_to_send = -1;
           }
           if (byte_to_send == -1 && Serial.available()) {
             byte_to_send = Serial.read();
