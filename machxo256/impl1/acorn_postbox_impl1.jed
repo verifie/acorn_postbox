@@ -6,7 +6,7 @@ NOTE Readback:       Off*
 NOTE Security:      Off*
 NOTE Copyright (C), 1992-2010, Lattice Semiconductor Corporation *
 NOTE All Rights Reserved *
-NOTE DATE CREATED: Fri Jun 12 11:46:12 2020 *
+NOTE DATE CREATED: Fri Jun 19 22:46:36 2020 *
 NOTE DESIGN NAME: post_box_usb *
 NOTE DEVICE NAME: LCMXO256C-3TQFP100 *
 NOTE PIN ASSIGNMENTS *
@@ -921,4 +921,4 @@ L00000
 CA739*
 N User Electronic Signature Data*
 U00000000000000000000000000000000*
-C1FD
+C20C
