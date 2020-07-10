@@ -17,6 +17,7 @@ import re
 import struct
 import sys
 import time
+from typing import List
 
 assert sys.version_info.major >= 3, "Python 3+ required"
 
@@ -171,8 +172,8 @@ class Postbox:
         self.finish_command()
 
         if SHOW_PROTOCOL: print("addr confirmation")
-        start_addr_confirmation = self.readword()
-        assert start_addr_confirmation == start_addr + n_words
+        confirmation = self.readword()
+        assert confirmation == start_addr + n_words
         self.reset_input_checksum();
         #data = bytearray()
         data = []
@@ -188,6 +189,33 @@ class Postbox:
         time_taken = time.time() - start_t
         print("read %d words from %08x in %.2f s (%.2f b/s)" % (n_words, start_addr, time_taken, n_words * 4 / time_taken))
         return data
+
+    def read_memory_word(self, addr):
+        return self.read_memory_words(addr, 1)[0]
+
+    def read_memory_bytes(self, start_addr, n_bytes):
+        print("reading %d bytes from %08x" % (n_bytes, start_addr))
+        start_t = time.time()
+        self.start_command(CMD_READ | CMD_READ_REPORT_ALL | CMD_READ_INCREMENT_ADDR | CMD_READ_BYTE)
+        self.sendword(n_bytes)
+        self.sendword(start_addr)
+        self.finish_command()
+
+        confirmation = self.readword()
+        assert confirmation == start_addr + n_bytes
+        self.reset_input_checksum();
+        data = []
+        for i in range(n_bytes):
+            b = self.readword()
+            data.append(b)
+        self.verify_input_checksum()
+        self.wait_ready()
+        time_taken = time.time() - start_t
+        print("read %d bytes from %08x in %.2f s (%.2f b/s)" % (n_bytes, start_addr, time_taken, n_bytes / time_taken))
+        return data
+
+    def read_memory_byte(self, addr):
+        return self.read_memory_bytes(addr, 1)[0]
 
     def __enter__(self):
         self.ser = board.Port().ser
@@ -233,7 +261,8 @@ class Postbox:
 
         print("\n* Successfully read %d bytes from 0x%08x" % (n_bytes, start_addr))
 
-    def write_memory(self, start_addr, data):
+    # write a word-aligned block of bytes to memory
+    def write_memory(self, start_addr: int, data: bytes):
         print("writing %d bytes to memory at 0x%08x" % (len(data), start_addr))
         assert (len(data) % 4) == 0, "Byte write not supported (yet)"
 
@@ -260,7 +289,8 @@ class Postbox:
         if addr & 3:
             raise AlignmentError("%08x is not word-aligned" % addr)
 
-    def write_memory_words(self, start_addr, data):
+    # write a list of words to memory
+    def write_memory_words(self, start_addr: int, data: List[int]):
         print("writing %d words to memory at 0x%08x" % (len(data), start_addr))
         self.check_aligned(start_addr)
 
@@ -275,6 +305,29 @@ class Postbox:
         if cs != data_checksum:
             raise ProtocolError("Send error; Target reported checksum %08x, expected %08x" % (cs, data_checksum))
         self.wait_ready()
+
+    def write_memory_word(self, addr, w):
+        return self.write_memory_words(addr, [w])
+
+    # write bytes to memory one at a time, using the byte write command.
+    # this is mainly useful for writing IOC registers.
+    def write_memory_bytes(self, start_addr, data: bytes):
+        print("writing %d bytes to memory at 0x%08x" % (len(data), start_addr))
+
+        self.start_command(CMD_WRITE | CMD_WRITE_NEW_DATA | CMD_WRITE_INCREMENT_ADDR | CMD_WRITE_BYTE)
+        self.sendword(len(data))
+        self.sendword(start_addr)
+        for b in data:
+            self.sendword(b)
+        data_checksum = self.output_checksum
+        self.finish_command()
+        cs = self.readword()
+        if cs != data_checksum:
+            raise ProtocolError("Send error; Target reported checksum %08x, expected %08x" % (cs, data_checksum))
+        self.wait_ready()
+
+    def write_memory_byte(self, addr, b):
+        return self.write_memory_bytes(addr, [b])
 
     def setup_memc(self, os_mode=0, sound_dma=0, video_dma=1, refresh=1, high_rom_time=0, low_rom_time=0, page_size=3):
 
