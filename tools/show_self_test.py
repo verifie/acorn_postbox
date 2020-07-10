@@ -22,8 +22,7 @@ with postbox.Postbox() as pb:
                   print()
                   last_printed = '\n'
             elif b == 0x90:
-                Serial.println("ERROR: Got 0x90 during POST")
-                break
+                print("ERROR: Got 0x90 during POST")
             elif b in (0x30, 0x20, 0x80):
                 pass
             else:
