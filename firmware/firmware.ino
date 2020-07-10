@@ -697,7 +697,7 @@ void loop() {
       case 'p': {
         Serial.println("LCD mode - Monitoring POST output:");
         target_sendbyte_block(0);
-        while (1) {
+        while (!check_disconnect()) {
           int i = target_readbyte();
           if (i >= 0) {
             uint8_t b = (uint8_t)i;
