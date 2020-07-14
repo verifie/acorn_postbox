@@ -1,4 +1,4 @@
-# Acorn POST code reader
+# Acorn POST interface test box
 
 [Stardot thread](https://stardot.org.uk/forums/viewtopic.php?f=16&t=17478)
 
@@ -14,7 +14,9 @@ This is a Verilog module which implements the Acorn POST Box / POST
 interface protocol and interfaces with a microcontroller.
 
 In its current form, it requires one of [these PCBs from
-myelin](https://stardot.org.uk/forums/viewtopic.php?f=16&t=17478&start=60#p271540).
+myelin](https://stardot.org.uk/forums/viewtopic.php?f=8&t=19815), or
+you can [make your
+own](https://github.com/google/myelin-acorn-electron-hardware/tree/master/post_box_usb).
 
 If you would rather output POST codes on an LCD, you want [philpem's
 repository](https://stardot.org.uk/forums/viewtopic.php?f=16&t=17478)
