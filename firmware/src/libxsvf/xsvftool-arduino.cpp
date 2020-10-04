@@ -206,21 +206,26 @@ static void h_report_error(struct libxsvf_host *h, const char *file, int line, c
 static void *h_realloc(struct libxsvf_host *h, void *ptr, int size, enum libxsvf_mem which)
 {
 	// Serial.println("realloc");
-	static unsigned char buf_svf_commandbuf[200];
-	static unsigned char buf_svf_sdr_tdi_data[16];
-	static unsigned char buf_svf_sdr_tdi_mask[16];
-	static unsigned char buf_svf_sdr_tdo_data[16];
-	static unsigned char buf_svf_sdr_tdo_mask[16];
-	static unsigned char buf_svf_sir_tdi_data[1];
-	static unsigned char buf_svf_sir_tdi_mask[1];
-	static unsigned char buf_svf_sir_tdo_data[1];
-	static unsigned char buf_svf_sir_tdo_mask[1];
+	static unsigned char buf_svf_commandbuf[200];  // entry 5
+	static unsigned char buf_svf_sdr_tdi_data[24]; // entry 6
+	static unsigned char buf_svf_sdr_tdi_mask[24]; // entry 7
+	static unsigned char buf_svf_sdr_tdo_data[24]; // 8
+	static unsigned char buf_svf_sdr_tdo_mask[24]; // 9
+	static unsigned char buf_svf_sir_tdi_data[1];  // 11
+	static unsigned char buf_svf_sir_tdi_mask[1];  // 12
+	static unsigned char buf_svf_sir_tdo_data[1];  // 13
+	static unsigned char buf_svf_sir_tdo_mask[1];  // 14
 	static unsigned char *buflist[15] = {
 		(unsigned char *)0, (unsigned char *)0, (unsigned char *)0, (unsigned char *)0,
 		(unsigned char *)0, buf_svf_commandbuf, buf_svf_sdr_tdi_data, buf_svf_sdr_tdi_mask,
 		buf_svf_sdr_tdo_data, buf_svf_sdr_tdo_mask, (unsigned char *)0, buf_svf_sir_tdi_data,
 		buf_svf_sir_tdi_mask, buf_svf_sir_tdo_data, buf_svf_sir_tdo_mask };
-	static int sizelist[15] = { 0, 0, 0, 0, 0, sizeof(buf_svf_commandbuf), sizeof(buf_svf_sdr_tdi_data), sizeof(buf_svf_sdr_tdi_mask), sizeof(buf_svf_sdr_tdo_data), sizeof(buf_svf_sdr_tdo_mask), 0, sizeof(buf_svf_sir_tdi_data), sizeof(buf_svf_sir_tdi_mask), sizeof(buf_svf_sir_tdo_data), sizeof(buf_svf_sir_tdo_mask) };
+	static int sizelist[15] = { 0, 0, 0, 0, 0,
+		sizeof(buf_svf_commandbuf), sizeof(buf_svf_sdr_tdi_data),
+		sizeof(buf_svf_sdr_tdi_mask), sizeof(buf_svf_sdr_tdo_data),
+		sizeof(buf_svf_sdr_tdo_mask), 0,
+		sizeof(buf_svf_sir_tdi_data), sizeof(buf_svf_sir_tdi_mask),
+		sizeof(buf_svf_sir_tdo_data), sizeof(buf_svf_sir_tdo_mask) };
 	if (which < 15 && size > sizelist[which]) {
 		Serial.print("Error attempting to allocate ");
 		Serial.print(size);

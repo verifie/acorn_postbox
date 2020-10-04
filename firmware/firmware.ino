@@ -70,6 +70,9 @@
 // Uncomment this to show every byte sent and received over SPI
 // #define SHOW_ALL_SPI_TRANSFERS
 
+// PA22 (MCU pin 21) - LINK/ACT LED on when driven low
+#define LINK_ACT_LED_PIN 36
+
 
 // libxsvf (xsvftool-arduino) entry point
 extern void arduino_play_svf(int tms_pin, int tdi_pin, int tdo_pin, int tck_pin, int trst_pin);
@@ -174,6 +177,8 @@ uint8_t spi_transfer(uint8_t b) {
 }
 
 void reset() {
+  // Turn off LED
+  digitalWrite(LINK_ACT_LED_PIN, HIGH);
   // clear out any unread input
   while (Serial.available() && !Serial.dtr()) {
     Serial.read();
@@ -194,6 +199,9 @@ bool check_disconnect() {
 
 // System startup
 void setup() {
+
+  pinMode(LINK_ACT_LED_PIN, OUTPUT);
+  digitalWrite(LINK_ACT_LED_PIN, HIGH);  // LED off
 
   // Enable SPI port on SERCOM2
   select_spi();
@@ -612,12 +620,16 @@ void loop() {
   if (!Serial.dtr()) {
     if (serial_active) {
       serial_active = 0;
+      // Turn off LED
+      digitalWrite(LINK_ACT_LED_PIN, HIGH);
     }
   } else if (!serial_active) {
     // USB serial connection is active
     serial_active_when = millis();
     serial_active = 1;
   } else if (serial_active == 1 && millis() - serial_active_when > 10) {
+    // Turn on LED
+    digitalWrite(LINK_ACT_LED_PIN, LOW);
     // Serial port should have settled by now
     Serial.print("MCU at ");
     Serial.print(SystemCoreClock);
@@ -636,9 +648,13 @@ void loop() {
   if (i >= 0) {
     uint8_t b = (uint8_t)i;
     // Not proxying POST output; data received between commands
-    Serial.print("[");
-    Serial.print(b, HEX);
-    Serial.print("]");
+    static int ff_count = 0;
+    if (b == 0xff) ++ff_count; else ff_count = 0;
+    if (ff_count < 100) {
+      Serial.print("[");
+      Serial.print(b, HEX);
+      Serial.print("]");
+    }
     if (b == 0x90) {
       if (!target_started) {
         Serial.println("Target is alive!");
@@ -653,10 +669,9 @@ void loop() {
     switch (c) {
       case 'C': {
         // program FPGA
-        Serial.println("TODO implement FPGA programming");
-        // Serial.println("SEND SVF");
-        // arduino_play_svf(TMS_PIN, TDI_PIN, TDO_PIN, TCK_PIN, -1);
-        // Serial.println("SVF DONE");
+        Serial.println("SEND SVF");
+        arduino_play_svf(TMS_PIN, TDI_PIN, TDO_PIN, TCK_PIN, -1);
+        Serial.println("SVF DONE");
         break;
       }
       case 's': {
