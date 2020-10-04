@@ -23,6 +23,7 @@ assert sys.version_info.major >= 3, "Python 3+ required"
 
 import board
 
+SHOW_RAW_IO = 0    # output actual bytes sent and received
 SHOW_ALL_DATA = 0  # output bytes and words read
 SHOW_PROTOCOL = 0  # output notes about what we're sending/receiving
 
@@ -69,7 +70,8 @@ class Postbox:
                     raise Timeout()
                 time.sleep(0.01)
         r, self.tail = self.tail[:n], self.tail[n:]
-        # print("read_n(%d) returning %s with tail=%s" % (n, repr(r), repr(self.tail)))
+        if SHOW_RAW_IO:
+            print("read_n(%d) returning %s with tail=%s" % (n, repr(r), repr(self.tail)))
         return r
 
     def read_until(self, match):
@@ -96,13 +98,13 @@ class Postbox:
 
     def sendbyte(self, b):
         t = bytes([b])
-        if SHOW_ALL_DATA:
+        if SHOW_RAW_IO or SHOW_ALL_DATA:
             print("send %s" % repr(t))
         self.ser.write(t)
 
     def readbyte(self):
         b = self.read_n(1)[0]
-        if SHOW_ALL_DATA:
+        if SHOW_RAW_IO or SHOW_ALL_DATA:
             print("readbyte -> %02x" % b)
         return b
 
@@ -116,7 +118,8 @@ class Postbox:
             (v & 0xFF00) >> 8,
             v & 0xFF,
         ])
-        # print("send %s" % repr(t))
+        if SHOW_RAW_IO:
+            print("send bytes: %s" % repr(t))
         self.ser.write(t)
 
     def readword(self):
@@ -177,7 +180,7 @@ class Postbox:
         self.reset_input_checksum();
         #data = bytearray()
         data = []
-        if SHOW_PROTOCOL: print("\n* End addr: %08x" % start_addr_confirmation)
+        if SHOW_PROTOCOL: print("\n* End addr: %08x" % confirmation)
         for i in range(n_words):
             w = self.readword()
             #print("read word %d -> %08x" % (i, w))
@@ -265,6 +268,8 @@ class Postbox:
     def write_memory(self, start_addr: int, data: bytes):
         print("writing %d bytes to memory at 0x%08x" % (len(data), start_addr))
         assert (len(data) % 4) == 0, "Byte write not supported (yet)"
+        if start_addr & (1<<21):
+            print("NOTE: address has LA21 asserted - TODO need to skip the pulse")
 
         start_t = time.time()
         self.start_command(CMD_WRITE | CMD_WRITE_NEW_DATA | CMD_WRITE_INCREMENT_ADDR | CMD_WRITE_WORD)
@@ -300,6 +305,7 @@ class Postbox:
         for w in data:
             self.sendword(w)
         data_checksum = self.output_checksum
+        if SHOW_PROTOCOL: print("Expect %02x then checksum %08x" % (self.last_command, data_checksum))
         self.finish_command()
         cs = self.readword()
         if cs != data_checksum:
@@ -328,6 +334,32 @@ class Postbox:
 
     def write_memory_byte(self, addr, b):
         return self.write_memory_bytes(addr, [b])
+
+    def iomd_rom_speed(self, rom_bank, write_enable=0, sixteen_bit=0, normal_speed=1, burst_time=0, access_time=0):
+        # ROMCR1 = 0x80
+        # ROMCR0 = 0x84
+        # Each register: WSHBBNNN
+        # W = write enable
+        # S = 16 bit mode when 1 / 32 bit mode when 0
+        # H = half speed (double all delays) when 0
+        # B = burst mode time (00 off, 01 4 memclk cycles, 10 3 memclk cycles, 11 2 memclk cycles)
+        # N = non-sequential time (0-5 = 7/6/5/4/3/2 memclk cycles, 6-7 undefined?)
+
+        assert rom_bank in (0, 1)
+        assert 0 <= burst_time <= 3
+        assert 0 <= access_time <= 5
+
+        reg_value = ((0x80 if write_enable else 0) |
+                     (0x40 if sixteen_bit else 0) |
+                     (0x20 if normal_speed else 0) |
+                     ((burst_time & 3) << 3) |
+                     (access_time & 7))
+
+        reg_addr = 0x3200080 + (rom_bank * 4)
+
+        print("Configure IOMD ROM bank %d: write_enable=%d, sixteen_bit=%d, normal_speed=%d, burst_time=%d, access_time=%d" % (
+            rom_bank, write_enable, sixteen_bit, normal_speed, burst_time, access_time))
+        self.write_memory_word(reg_addr, reg_value)
 
     def setup_memc(self, os_mode=0, sound_dma=0, video_dma=1, refresh=1, high_rom_time=0, low_rom_time=0, page_size=3):
 
