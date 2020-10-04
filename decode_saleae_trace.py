@@ -7,7 +7,7 @@ import sys
 PULSE_DETAIL = 0
 COUNT_DETAIL = 0
 BYTE_DETAIL = 0
-BYTE_TIME = 0  # show when each char was received
+BYTE_TIME = 1  # show when each char was received
 
 class Processor:
 
@@ -45,7 +45,8 @@ class Processor:
 
             if val and not lastval:
                 gap = ts - lastpulse
-                if gap > 15:  # > 15 us means separate group
+                # print("rising edge on testreq at %f with gap %f" % (ts, gap))
+                if gap > 10:  # > 10 us means separate group
                     if COUNT_DETAIL or PULSE_DETAIL:
                         print("space after %d pulses\n" % pulsecount)
 
@@ -76,13 +77,13 @@ class Processor:
                 print(self.line_so_far)
                 self.line_so_far = ''
         else:
-            if BYTE_DETAIL: print("read byte: %02x (%s)" % (shifter, chr(shifter) if shifter >= 32 and shifter < 128 else '?'))
+            if BYTE_DETAIL: print("read byte: %02x (%s)" % (shifter, chr(shifter) if 32 <= shifter < 128 else '?'))
             if (shifter & 0xf) == 8:
                 if (self.last_byte & 0xf) == 8:
                     c = (self.last_byte & 0xf0) | ((shifter & 0xf0) >> 4)
                     self.line_so_far += chr(c)
                     if BYTE_TIME:
-                        print("<%s>" % ts, end='')
+                        print("<%s:%s>" % (ts, chr(c)))
                     shifter = 0  # hack to prevent double printing chars
                     #printed_something = 1
             elif shifter not in (0, 0x30, 0x20, 0x80):
@@ -93,11 +94,17 @@ class Processor:
     def decode_chars(self, fn):
         print("Decoding chars from %s" % fn)
         for line in open(fn, 'rt'):
-            #print line.strip()
+            #print(line.strip())
             m = re.search(r'\(0x(..)\)', line)
+            if m:
+                ts, b = None, m.group(1)
+            if not m:
+                m = re.search(r'^(.*?),0x(..)$', line)
+                if m:
+                    ts, b = m.groups()
             if not m: continue
-            b = int(m.group(1), 16)
-            self.received_byte(b)
+            b = int(b, 16)
+            self.received_byte(b, ts)
 
 p = Processor()
 
