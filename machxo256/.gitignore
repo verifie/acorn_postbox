@@ -3,3 +3,4 @@ impl1/
 *.html
 *.log
 *.xml
+.*.ini

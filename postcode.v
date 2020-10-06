@@ -75,6 +75,10 @@ module postcode
     localparam S_INPUT_BIT2 = 5'd10;
     localparam S_INPUT_BIT1 = 5'd11;
     localparam S_INPUT_BIT0 = 5'd12;
+    localparam S_POST_INPUT_IGNORE_1 = 5'd13;
+    localparam S_POST_INPUT_IGNORE_2 = 5'd14;
+    localparam S_POST_INPUT_IGNORE_3 = 5'd15;
+    localparam S_POST_INPUT_IGNORE_4 = 5'd16;
 
     reg[4:0] state = S_INITIAL;
     reg [3:0] rxcounter = 4'b0;  // count of bits received
@@ -256,8 +260,34 @@ module postcode
                         state <= S_INPUT_BIT0;
                     end
 
+                    // Ignore the next four pulses after a successful transmission to the target
                     S_INPUT_BIT0: begin
-                        $display("Pulse 13: target is requesting another byte; txbuf_full=%d", txbuf_full);
+                        // Pulse 13; ignore this as it could be a spurious pulse or a pulse 4
+                        $display("Ignore pulse 13");
+                        testack_int <= 1'b0;
+                        state <= S_POST_INPUT_IGNORE_1;
+                    end
+
+                    S_POST_INPUT_IGNORE_1: begin
+                        // Pulse 14: ignore as it could be a pulse 4 or a pulse 1
+                        $display("Ignore pulse 14");
+                        state <= S_POST_INPUT_IGNORE_2;
+                    end
+
+                    S_POST_INPUT_IGNORE_2: begin
+                        // Pulse 15: ignore as it could be a pulse 4 or a pulse 2
+                        $display("Ignore pulse 15");
+                        state <= S_POST_INPUT_IGNORE_3;
+                    end
+
+                    S_POST_INPUT_IGNORE_3: begin
+                        // Pulse 16: ignore as it could be a pulse 4 or a pulse 3
+                        $display("Ignore pulse 16");
+                        state <= S_POST_INPUT_IGNORE_4;
+                    end
+
+                    S_POST_INPUT_IGNORE_4: begin
+                        $display("Pulse 17: target is requesting another byte; txbuf_full=%d", txbuf_full);
                         testack_int <= txbuf_full;
                         state <= S_INPUTPOLL;
                         if (txbuf_full) begin

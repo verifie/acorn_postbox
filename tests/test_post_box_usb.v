@@ -202,20 +202,27 @@ module test;
         `assert(input_sr == 8'hc3, "Input shifter value incorrect");
 
         $display("\n### Test chained input (writes to target): 12, ff, 34");
+        $display("* Send 12");
         spi_txn(1, 1, 8'h12, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulse(12);
         `assert(input_sr == 8'h12, "Input shifter value incorrect");
+        pulse(4);  // Skip ignored pulses
+        $display("* Send ff");
         spi_txn(1, 1, 8'hff, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulse(9);
         `assert(input_sr == 8'hff, "Input shifter value incorrect");
+        pulse(4);  // Skip ignored pulses
+        $display("* Send 34");
         spi_txn(1, 1, 8'h34, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulse(9);
         `assert(input_sr == 8'h34, "Input shifter value incorrect");
+        pulse(4);  // Skip ignored pulses
         pulse(23);  // Make sure we can handle a long poll
         `assert(lastAck == 1'b0, "Input-ready shouldn't reassert until we send a byte over SPI");
         spi_txn(1, 1, 8'h2f, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
         pulse(9);
         `assert(input_sr == 8'h2f, "Input shifter value incorrect");
+        pulse(4);  // Skip ignored pulses
         pulse(1);
         `assert(lastAck == 1'b0, "Input-ready received when not expected");
 

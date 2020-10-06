@@ -176,6 +176,14 @@ uint8_t spi_transfer(uint8_t b) {
   return r;
 }
 
+static void set_jtag_pins_idle() {
+  // JTAG disabled so we don't conflict with a plugged-in programmer
+  pinMode(TDO_PIN, INPUT);
+  pinMode(TDI_PIN, INPUT);
+  pinMode(TMS_PIN, INPUT);
+  pinMode(TCK_PIN, INPUT);
+}
+
 void reset() {
   // Turn off LED
   digitalWrite(LINK_ACT_LED_PIN, HIGH);
@@ -234,22 +242,7 @@ void setup() {
   // enable GCLK_IO[4] on PA10
   pinPeripheral(CLOCK_48MHZ_PIN, PIO_AC_CLK);
 
-#ifdef ENABLE_JTAG
-  // Set pin directions for FPGA JTAG.
-  pinMode(TDO_PIN, INPUT);
-  pinMode(TDI_PIN, OUTPUT);
-  digitalWrite(TDI_PIN, HIGH);
-  pinMode(TMS_PIN, OUTPUT);
-  digitalWrite(TMS_PIN, HIGH);
-  pinMode(TCK_PIN, OUTPUT);
-  digitalWrite(TCK_PIN, LOW);
-#else  // !ENABLE_JTAG
-  // JTAG disabled so we don't conflict with a plugged-in programmer
-  pinMode(TDO_PIN, INPUT);
-  pinMode(TDI_PIN, INPUT);
-  pinMode(TMS_PIN, INPUT);
-  pinMode(TCK_PIN, INPUT);
-#endif
+  set_jtag_pins_idle();
 
   // Set up USB serial port
   Serial.begin(9600);
@@ -671,6 +664,7 @@ void loop() {
         // program FPGA
         Serial.println("SEND SVF");
         arduino_play_svf(TMS_PIN, TDI_PIN, TDO_PIN, TCK_PIN, -1);
+        set_jtag_pins_idle();
         Serial.println("SVF DONE");
         break;
       }
