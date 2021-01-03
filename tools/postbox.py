@@ -1,4 +1,4 @@
- # Copyright 2017 Google Inc.
+# Copyright 2017 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,6 +48,31 @@ CMD_READ_INCREMENT_ADDR = 0x02
 CMD_READ_SAME_ADDR = 0
 CMD_READ_BYTE = 0x01
 CMD_READ_WORD = 0
+
+MEMC_PAGE_4K = 0
+MEMC_PAGE_8K = 1
+MEMC_PAGE_16K = 2
+MEMC_PAGE_32K = 3
+
+MEMC_ROM_SPEED_4N_4S = 0
+MEMC_ROM_SPEED_3N_3S = 1
+MEMC_ROM_SPEED_2N_2S = 2
+MEMC_ROM_SPEED_2N_1S = 3
+
+class State:
+    started = False
+
+def fmt_duration(s):
+    if s < 60:
+        return "%ds" % int(s)
+    if s < 3600:
+        return "%dm%ds" % (
+            int(s) // 60, int(s) % 60)
+    return "%dh%dm%ds" % (
+        int(s) // 3600,
+        (int(s) % 3600) // 60,
+        int(s) % 60,
+    )
 
 class Postbox:
 
@@ -130,6 +155,9 @@ class Postbox:
         return v
 
     def start_command(self, cmd):
+        # while self.tail.startswith(b'\x90'):
+        #     print("WARNING unexpected 0x90 in buffer at command start")
+        #     self.tail = self.tail[1:]
         assert not self.tail, "tail contains data at command start: %s" % repr(self.tail)
         self.last_command = cmd
         self.sendbyte(cmd)
@@ -221,6 +249,10 @@ class Postbox:
         return self.read_memory_bytes(addr, 1)[0]
 
     def __enter__(self):
+        if State.started:
+            print("* Giving the port a second to close")
+            time.sleep(1)
+
         self.ser = board.Port().ser
 
         print("* Port open.  Waiting for OK.")
@@ -237,9 +269,11 @@ class Postbox:
         self.read_until(b"\x90")
 
         print("* POST box connected")
+        State.started = True
         return self
 
     def __exit__(self, type, value, traceback):
+        print("* Closing port")
         if self.ser:
             self.ser.close()
 
@@ -256,13 +290,25 @@ class Postbox:
         blksize = 16 * 1024
 
         rom = bytearray()
+        start_time = time.time()
         for blk in range(0, n_bytes, blksize):
-            d = self.read_memory(start_addr + blk, blksize)
+            this_block_size = min(blksize, n_bytes - blk)
+            d = self.read_memory(start_addr + blk, this_block_size)
             rom += d
             f.write(d)
-            assert len(rom) == blk + blksize, "collected %d bytes, expected %d+%d = %d" % (len(rom), blk, blksize, blk+blksize)
+            assert len(rom) == blk + this_block_size, "collected %d bytes, expected %d+%d = %d" % (len(rom), blk, this_block_size, blk+this_block_size)
+            time_taken = time.time() - start_time
+            progress = float(len(rom)) / n_bytes
+            print("Total: %d / %d bytes read (%.1f%%) %s/%s" % (
+                len(rom), n_bytes,
+                progress * 100,
+                fmt_duration(time_taken), fmt_duration(time_taken / progress),
+                ))
 
         print("\n* Successfully read %d bytes from 0x%08x" % (n_bytes, start_addr))
+        print("\n* SHA1 %s" % hashlib.sha1(rom).hexdigest())
+
+        return rom
 
     # write a word-aligned block of bytes to memory
     def write_memory(self, start_addr: int, data: bytes):

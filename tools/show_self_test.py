@@ -4,6 +4,7 @@ import time
 
 import postbox
 
+
 def main():
     with postbox.Postbox() as pb:
         pb.sendbyte(0)
