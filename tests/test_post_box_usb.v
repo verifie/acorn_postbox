@@ -226,6 +226,62 @@ module test;
         pulse(1);
         `assert(lastAck == 1'b0, "Input-ready received when not expected");
 
+        $display("\n### Test input, ~5us gap, spurious pulse, ~5us gap, input (i.e. write to a register with A21 set)");
+        #BREAK
+        $display("* Send 12");
+        spi_txn(1, 1, 8'h12, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        pulse(12);
+        `assert(input_sr == 8'h12, "Input shifter value 1 incorrect");
+        #5000
+        pulse(1);  // spurious pulse 4
+        #5000
+        $display("* Send 34");
+        spi_txn(1, 1, 8'h34, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        pulse(9 + 3);  // three more ignored pulses, plus 9 for reception
+        `assert(input_sr == 8'h34, "Input shifter value 2 incorrect");
+
+        $display("\n### Test input, ~5us gap, spurious pulse, ~12us gap, input (i.e. write to a register with A21 set)");
+        #BREAK
+        $display("* Send 12");
+        spi_txn(1, 1, 8'h12, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        pulse(12);
+        `assert(input_sr == 8'h12, "Input shifter value 1 incorrect");
+        #5000
+        pulse(1);  // spurious pulse 4
+        #12000
+        $display("* Send 34");
+        spi_txn(1, 1, 8'h34, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        pulse(9 + 3);  // three more ignored pulses, plus 9 for reception
+        `assert(input_sr == 8'h34, "Input shifter value 2 incorrect");
+
+        $display("\n### Test input, ~12us gap, spurious pulse, ~5us gap, input (i.e. write to a register with A21 set)");
+        #BREAK
+        $display("* Send 12");
+        spi_txn(1, 1, 8'h12, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        pulse(12);
+        `assert(input_sr == 8'h12, "Input shifter value 1 incorrect");
+        #12000
+        pulse(1);  // spurious pulse 4
+        #5000
+        $display("* Send 34");
+        spi_txn(1, 1, 8'h34, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        pulse(9 + 3);  // three more ignored pulses, plus 9 for reception
+        `assert(input_sr == 8'h34, "Input shifter value 2 incorrect");
+
+        $display("\n### Test input, ~12us gap, spurious pulse, ~12us gap, input (i.e. write to a register with A21 set)");
+        #BREAK
+        $display("* Send 12");
+        spi_txn(1, 1, 8'h12, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        pulse(12);
+        `assert(input_sr == 8'h12, "Input shifter value 1 incorrect");
+        #12000
+        pulse(1);  // spurious pulse 4
+        #12000
+        $display("* Send 34");
+        spi_txn(1, 1, 8'h34, spi_sent_byte, spi_received_byte, spi_data, remote_had_byte, remote_had_space);
+        pulse(9 + 3);  // three more ignored pulses, plus 9 for reception
+        `assert(input_sr == 8'h34, "Input shifter value 2 incorrect");
+
         $display("\n### TODO look at the RISC OS code and see if there's anything interesting to test from there");
 
         $display("OK!  post_box_usb test completed. reqcount=%0d, time=%0d", reqcount, $time);

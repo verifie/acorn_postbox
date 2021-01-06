@@ -9,7 +9,10 @@ module postcode
     parameter REFCLK_FREQ = 48000000,
 
     // Timer timeout value, in refclk ticks
-    parameter TIMER_MAX = 480  // 10 us
+    parameter TIMER_MAX = 480,  // 10 us
+
+    // Bit width of timer variable (needs to hold up to TIMER_MAX * 2)
+    parameter TIMER_WIDTH = 10
 )
 
 (
@@ -54,7 +57,13 @@ module postcode
     // Monostable -- pulse train end detector
     // Reset to zero every time TESTREQ pulses high.
     // Stops on expiry.
-    reg [8:0] timer;
+    reg [TIMER_WIDTH-1:0] timer;
+
+    // When set, this doubles the timeout.  All tested target machines take
+    // quite a while to switch from reception to transmission (>60us), so it's
+    // okay to have a longer timeout right after the target has received a
+    // byte, i.e. during the "S_POST_INPUT_IGNORE_*" states.
+    reg double_timeout = 0;
 
 
     // Transmit shift register -- data to the target ("input")
@@ -101,7 +110,7 @@ module postcode
         // Synchronize testreq
         testreq_sync <= {testreq_sync[1:0], testreq};
         if (testreq_sync[1]) begin
-            timer <= 9'b0;
+            timer <= {TIMER_WIDTH{1'b0}};
             if (!testreq_sync[2]) begin
                 // Rising edge on testreq
 
@@ -258,6 +267,8 @@ module postcode
                         $display("Pulse 12: send bit 0");
                         testack_int <= txshift[0];
                         state <= S_INPUT_BIT0;
+                        // Double the timeout during the "ignore" phase
+                        double_timeout <= 1'b1;
                     end
 
                     // Ignore the next four pulses after a successful transmission to the target
@@ -287,6 +298,8 @@ module postcode
                     end
 
                     S_POST_INPUT_IGNORE_4: begin
+                        // Back to normal timeout
+                        double_timeout <= 1'b0;
                         $display("Pulse 17: target is requesting another byte; txbuf_full=%d", txbuf_full);
                         testack_int <= txbuf_full;
                         state <= S_INPUTPOLL;
@@ -305,13 +318,17 @@ module postcode
                 endcase
             end
         end else begin
-            if (timer <= TIMER_MAX) begin
-                timer = timer + 9'd1;
+            if (timer <= (double_timeout ? TIMER_MAX * 2 : TIMER_MAX)) begin
+                timer <= timer + {{(TIMER_WIDTH-1){1'd0}}, 1'd1};
             end
-            if (timer == TIMER_MAX) begin
+            if (timer == (double_timeout ? TIMER_MAX * 2 : TIMER_MAX)) begin
                 // Timer just expired
                 state <= S_INITIAL;
 
+                // Reset to normal timeout behavior
+                double_timeout <= 1'b0;
+
+                // Shift in a bit if we're mid-reception
                 if (!rxbuf_full && (state == S_SHIFTZERO || state == S_SHIFTONE)) begin
                     rxshift <= {rxshift[6:0], state == S_SHIFTZERO ? 1'b0 : 1'b1};
                     rxcounter <= rxcounter + 4'd1;
