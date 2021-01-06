@@ -19,19 +19,26 @@ import sys
 import time
 from typing import List
 
-assert sys.version_info.major >= 3, "Python 3+ required"
+assert sys.version_info[0] >= 3, "Python 3+ required"
 
 import board
 
-SHOW_RAW_IO = 0    # output actual bytes sent and received
+SHOW_RAW_IO = 0  # output actual bytes sent and received
 SHOW_ALL_DATA = 0  # output bytes and words read
 SHOW_PROTOCOL = 0  # output notes about what we're sending/receiving
 
-class ProtocolError(Exception): pass
 
-class Timeout(ProtocolError): pass
+class ProtocolError(Exception):
+    pass
 
-class AlignmentError(ProtocolError): pass
+
+class Timeout(ProtocolError):
+    pass
+
+
+class AlignmentError(ProtocolError):
+    pass
+
 
 CMD_WRITE = 0x08
 CMD_WRITE_NEW_DATA = 0x04
@@ -59,23 +66,24 @@ MEMC_ROM_SPEED_3N_3S = 1
 MEMC_ROM_SPEED_2N_2S = 2
 MEMC_ROM_SPEED_2N_1S = 3
 
+
 class State:
     started = False
+
 
 def fmt_duration(s):
     if s < 60:
         return "%ds" % int(s)
     if s < 3600:
-        return "%dm%ds" % (
-            int(s) // 60, int(s) % 60)
+        return "%dm%ds" % (int(s) // 60, int(s) % 60)
     return "%dh%dm%ds" % (
         int(s) // 3600,
         (int(s) % 3600) // 60,
         int(s) % 60,
     )
 
-class Postbox:
 
+class Postbox:
     def __init__(self):
         self.read_buffer = None
         self.input_checksum = 0
@@ -96,7 +104,9 @@ class Postbox:
                 time.sleep(0.01)
         r, self.tail = self.tail[:n], self.tail[n:]
         if SHOW_RAW_IO:
-            print("read_n(%d) returning %s with tail=%s" % (n, repr(r), repr(self.tail)))
+            print(
+                "read_n(%d) returning %s with tail=%s" % (n, repr(r), repr(self.tail))
+            )
         return r
 
     def read_until(self, match):
@@ -137,12 +147,14 @@ class Postbox:
         self.output_checksum = (self.output_checksum + v) & 0xFFFFFFFF
         if SHOW_ALL_DATA:
             print("send word %08x; checksum -> %08x" % (v, self.output_checksum))
-        t = bytes([
-            (v & 0xFF000000) >> 24,
-            (v & 0xFF0000) >> 16,
-            (v & 0xFF00) >> 8,
-            v & 0xFF,
-        ])
+        t = bytes(
+            [
+                (v & 0xFF000000) >> 24,
+                (v & 0xFF0000) >> 16,
+                (v & 0xFF00) >> 8,
+                v & 0xFF,
+            ]
+        )
         if SHOW_RAW_IO:
             print("send bytes: %s" % repr(t))
         self.ser.write(t)
@@ -151,14 +163,17 @@ class Postbox:
         w = self.read_n(4)
         v = (w[0] << 24) | (w[1] << 16) | (w[2] << 8) | (w[3])
         self.input_checksum = (self.input_checksum + v) & 0xFFFFFFFF
-        if SHOW_ALL_DATA: print("readword -> %08x; checksum -> %08x" % (v, self.input_checksum))
+        if SHOW_ALL_DATA:
+            print("readword -> %08x; checksum -> %08x" % (v, self.input_checksum))
         return v
 
     def start_command(self, cmd):
         # while self.tail.startswith(b'\x90'):
         #     print("WARNING unexpected 0x90 in buffer at command start")
         #     self.tail = self.tail[1:]
-        assert not self.tail, "tail contains data at command start: %s" % repr(self.tail)
+        assert not self.tail, "tail contains data at command start: %s" % repr(
+            self.tail
+        )
         self.last_command = cmd
         self.sendbyte(cmd)
         self.reset_checksum()
@@ -168,10 +183,12 @@ class Postbox:
         self.sendword(fixup)
 
         r = self.readbyte()
-        if r == 0xff:
+        if r == 0xFF:
             raise ProtocolError("Checksum error in data we sent")
         if r != self.last_command:
-            raise ProtocolError("command byte should have been echoed; got %02x instead" % r)
+            raise ProtocolError(
+                "command byte should have been echoed; got %02x instead" % r
+            )
 
     def reset_checksum(self):
         self.output_checksum = 0
@@ -182,43 +199,60 @@ class Postbox:
     def verify_input_checksum(self):
         self.readword()  # read checksum complement, which should zero out the sum
         if self.input_checksum != 0:
-            raise ProtocolError("Checksum invalid; total sum is %08x, should be zero" % self.input_checksum)
+            raise ProtocolError(
+                "Checksum invalid; total sum is %08x, should be zero"
+                % self.input_checksum
+            )
 
     def wait_ready(self):
         ready_byte = self.readbyte()
         if ready_byte != 0x90:
-            raise ProtocolError("got 0x%02x instead of 0x90 at end of command" % ready_byte)
+            raise ProtocolError(
+                "got 0x%02x instead of 0x90 at end of command" % ready_byte
+            )
 
     def read_memory_words(self, start_addr, n_words):
         self.check_aligned(start_addr)
         print("reading %d words from %08x" % (n_words, start_addr))
         start_t = time.time()
-        if SHOW_PROTOCOL: print("start command")
-        self.start_command(CMD_READ | CMD_READ_REPORT_ALL | CMD_READ_INCREMENT_ADDR | CMD_READ_WORD)
-        if SHOW_PROTOCOL: print("send n")
+        if SHOW_PROTOCOL:
+            print("start command")
+        self.start_command(
+            CMD_READ | CMD_READ_REPORT_ALL | CMD_READ_INCREMENT_ADDR | CMD_READ_WORD
+        )
+        if SHOW_PROTOCOL:
+            print("send n")
         self.sendword(n_words)
-        if SHOW_PROTOCOL: print("send start")
+        if SHOW_PROTOCOL:
+            print("send start")
         self.sendword(start_addr)
-        if SHOW_PROTOCOL: print("finish command")
+        if SHOW_PROTOCOL:
+            print("finish command")
         self.finish_command()
 
-        if SHOW_PROTOCOL: print("addr confirmation")
+        if SHOW_PROTOCOL:
+            print("addr confirmation")
         confirmation = self.readword()
         assert confirmation == start_addr + n_words
-        self.reset_input_checksum();
-        #data = bytearray()
+        self.reset_input_checksum()
+        # data = bytearray()
         data = []
-        if SHOW_PROTOCOL: print("\n* End addr: %08x" % confirmation)
+        if SHOW_PROTOCOL:
+            print("\n* End addr: %08x" % confirmation)
         for i in range(n_words):
             w = self.readword()
-            #print("read word %d -> %08x" % (i, w))
-            #data += struct.pack("<I", w)
+            # print("read word %d -> %08x" % (i, w))
+            # data += struct.pack("<I", w)
             data.append(w)
         self.verify_input_checksum()
-        if SHOW_PROTOCOL: print("read %d bytes" % len(data))
+        if SHOW_PROTOCOL:
+            print("read %d bytes" % len(data))
         self.wait_ready()
         time_taken = time.time() - start_t
-        print("read %d words from %08x in %.2f s (%.2f b/s)" % (n_words, start_addr, time_taken, n_words * 4 / time_taken))
+        print(
+            "read %d words from %08x in %.2f s (%.2f b/s)"
+            % (n_words, start_addr, time_taken, n_words * 4 / time_taken)
+        )
         return data
 
     def read_memory_word(self, addr):
@@ -227,14 +261,16 @@ class Postbox:
     def read_memory_bytes(self, start_addr, n_bytes):
         print("reading %d bytes from %08x" % (n_bytes, start_addr))
         start_t = time.time()
-        self.start_command(CMD_READ | CMD_READ_REPORT_ALL | CMD_READ_INCREMENT_ADDR | CMD_READ_BYTE)
+        self.start_command(
+            CMD_READ | CMD_READ_REPORT_ALL | CMD_READ_INCREMENT_ADDR | CMD_READ_BYTE
+        )
         self.sendword(n_bytes)
         self.sendword(start_addr)
         self.finish_command()
 
         confirmation = self.readword()
         assert confirmation == start_addr + n_bytes
-        self.reset_input_checksum();
+        self.reset_input_checksum()
         data = []
         for i in range(n_bytes):
             b = self.readword()
@@ -242,7 +278,10 @@ class Postbox:
         self.verify_input_checksum()
         self.wait_ready()
         time_taken = time.time() - start_t
-        print("read %d bytes from %08x in %.2f s (%.2f b/s)" % (n_bytes, start_addr, time_taken, n_bytes / time_taken))
+        print(
+            "read %d bytes from %08x in %.2f s (%.2f b/s)"
+            % (n_bytes, start_addr, time_taken, n_bytes / time_taken)
+        )
         return data
 
     def read_memory_byte(self, addr):
@@ -296,14 +335,26 @@ class Postbox:
             d = self.read_memory(start_addr + blk, this_block_size)
             rom += d
             f.write(d)
-            assert len(rom) == blk + this_block_size, "collected %d bytes, expected %d+%d = %d" % (len(rom), blk, this_block_size, blk+this_block_size)
+            assert (
+                len(rom) == blk + this_block_size
+            ), "collected %d bytes, expected %d+%d = %d" % (
+                len(rom),
+                blk,
+                this_block_size,
+                blk + this_block_size,
+            )
             time_taken = time.time() - start_time
             progress = float(len(rom)) / n_bytes
-            print("Total: %d / %d bytes read (%.1f%%) %s/%s" % (
-                len(rom), n_bytes,
-                progress * 100,
-                fmt_duration(time_taken), fmt_duration(time_taken / progress),
-                ))
+            print(
+                "Total: %d / %d bytes read (%.1f%%) %s/%s"
+                % (
+                    len(rom),
+                    n_bytes,
+                    progress * 100,
+                    fmt_duration(time_taken),
+                    fmt_duration(time_taken / progress),
+                )
+            )
 
         print("\n* Successfully read %d bytes from 0x%08x" % (n_bytes, start_addr))
         print("\n* SHA1 %s" % hashlib.sha1(rom).hexdigest())
@@ -314,27 +365,37 @@ class Postbox:
     def write_memory(self, start_addr: int, data: bytes):
         print("writing %d bytes to memory at 0x%08x" % (len(data), start_addr))
         assert (len(data) % 4) == 0, "Byte write not supported (yet)"
-        if start_addr & (1<<21):
+        if start_addr & (1 << 21):
             print("NOTE: address has LA21 asserted - TODO need to skip the pulse")
 
         start_t = time.time()
-        self.start_command(CMD_WRITE | CMD_WRITE_NEW_DATA | CMD_WRITE_INCREMENT_ADDR | CMD_WRITE_WORD)
+        self.start_command(
+            CMD_WRITE | CMD_WRITE_NEW_DATA | CMD_WRITE_INCREMENT_ADDR | CMD_WRITE_WORD
+        )
         self.sendword(len(data) >> 2)
         self.sendword(start_addr)
         for ptr in range(0, len(data), 4):
-            w = (data[ptr]
-                 | (data[ptr+1] << 8)
-                 | (data[ptr+2] << 16)
-                 | (data[ptr+3] << 24))
+            w = (
+                data[ptr]
+                | (data[ptr + 1] << 8)
+                | (data[ptr + 2] << 16)
+                | (data[ptr + 3] << 24)
+            )
             self.sendword(w)
         data_checksum = self.output_checksum
         self.finish_command()
         cs = self.readword()
         if cs != data_checksum:
-            raise ProtocolError("Send error; Target reported checksum %08x, expected %08x" % (cs, data_checksum))
+            raise ProtocolError(
+                "Send error; Target reported checksum %08x, expected %08x"
+                % (cs, data_checksum)
+            )
         self.wait_ready()
         time_taken = time.time() - start_t
-        print("wrote %d bytes to %08x in %.2f s (%.2f b/s)" % (len(data), start_addr, time_taken, len(data) / time_taken))
+        print(
+            "wrote %d bytes to %08x in %.2f s (%.2f b/s)"
+            % (len(data), start_addr, time_taken, len(data) / time_taken)
+        )
 
     def check_aligned(self, addr):
         if addr & 3:
@@ -345,17 +406,23 @@ class Postbox:
         print("writing %d words to memory at 0x%08x" % (len(data), start_addr))
         self.check_aligned(start_addr)
 
-        self.start_command(CMD_WRITE | CMD_WRITE_NEW_DATA | CMD_WRITE_INCREMENT_ADDR | CMD_WRITE_WORD)
+        self.start_command(
+            CMD_WRITE | CMD_WRITE_NEW_DATA | CMD_WRITE_INCREMENT_ADDR | CMD_WRITE_WORD
+        )
         self.sendword(len(data))
         self.sendword(start_addr)
         for w in data:
             self.sendword(w)
         data_checksum = self.output_checksum
-        if SHOW_PROTOCOL: print("Expect %02x then checksum %08x" % (self.last_command, data_checksum))
+        if SHOW_PROTOCOL:
+            print("Expect %02x then checksum %08x" % (self.last_command, data_checksum))
         self.finish_command()
         cs = self.readword()
         if cs != data_checksum:
-            raise ProtocolError("Send error; Target reported checksum %08x, expected %08x" % (cs, data_checksum))
+            raise ProtocolError(
+                "Send error; Target reported checksum %08x, expected %08x"
+                % (cs, data_checksum)
+            )
         self.wait_ready()
 
     def write_memory_word(self, addr, w):
@@ -366,7 +433,9 @@ class Postbox:
     def write_memory_bytes(self, start_addr, data: bytes):
         print("writing %d bytes to memory at 0x%08x" % (len(data), start_addr))
 
-        self.start_command(CMD_WRITE | CMD_WRITE_NEW_DATA | CMD_WRITE_INCREMENT_ADDR | CMD_WRITE_BYTE)
+        self.start_command(
+            CMD_WRITE | CMD_WRITE_NEW_DATA | CMD_WRITE_INCREMENT_ADDR | CMD_WRITE_BYTE
+        )
         self.sendword(len(data))
         self.sendword(start_addr)
         for b in data:
@@ -375,13 +444,24 @@ class Postbox:
         self.finish_command()
         cs = self.readword()
         if cs != data_checksum:
-            raise ProtocolError("Send error; Target reported checksum %08x, expected %08x" % (cs, data_checksum))
+            raise ProtocolError(
+                "Send error; Target reported checksum %08x, expected %08x"
+                % (cs, data_checksum)
+            )
         self.wait_ready()
 
     def write_memory_byte(self, addr, b):
         return self.write_memory_bytes(addr, [b])
 
-    def iomd_rom_speed(self, rom_bank, write_enable=0, sixteen_bit=0, normal_speed=1, burst_time=0, access_time=0):
+    def iomd_rom_speed(
+        self,
+        rom_bank,
+        write_enable=0,
+        sixteen_bit=0,
+        normal_speed=1,
+        burst_time=0,
+        access_time=0,
+    ):
         # ROMCR1 = 0x80
         # ROMCR0 = 0x84
         # Each register: WSHBBNNN
@@ -395,19 +475,39 @@ class Postbox:
         assert 0 <= burst_time <= 3
         assert 0 <= access_time <= 5
 
-        reg_value = ((0x80 if write_enable else 0) |
-                     (0x40 if sixteen_bit else 0) |
-                     (0x20 if normal_speed else 0) |
-                     ((burst_time & 3) << 3) |
-                     (access_time & 7))
+        reg_value = (
+            (0x80 if write_enable else 0)
+            | (0x40 if sixteen_bit else 0)
+            | (0x20 if normal_speed else 0)
+            | ((burst_time & 3) << 3)
+            | (access_time & 7)
+        )
 
         reg_addr = 0x3200080 + (rom_bank * 4)
 
-        print("Configure IOMD ROM bank %d: write_enable=%d, sixteen_bit=%d, normal_speed=%d, burst_time=%d, access_time=%d" % (
-            rom_bank, write_enable, sixteen_bit, normal_speed, burst_time, access_time))
+        print(
+            "Configure IOMD ROM bank %d: write_enable=%d, sixteen_bit=%d, normal_speed=%d, burst_time=%d, access_time=%d"
+            % (
+                rom_bank,
+                write_enable,
+                sixteen_bit,
+                normal_speed,
+                burst_time,
+                access_time,
+            )
+        )
         self.write_memory_word(reg_addr, reg_value)
 
-    def setup_memc(self, os_mode=0, sound_dma=0, video_dma=1, refresh=1, high_rom_time=0, low_rom_time=0, page_size=3):
+    def setup_memc(
+        self,
+        os_mode=0,
+        sound_dma=0,
+        video_dma=1,
+        refresh=1,
+        high_rom_time=0,
+        low_rom_time=0,
+        page_size=3,
+    ):
 
         # high_rom_time=0 = four clocks (500 ns) per access
         # high_rom_time=1 = three clocks (375 ns) per access
@@ -419,15 +519,29 @@ class Postbox:
         # (only refresh during flyback as memc uses the refresh register
         # as the dma pointer)
         # 0C = 00 high rom time; 00 low rom time; 11 page size; XX
-        control = (0x036E0000
-                   | os_mode << 12
-                   | sound_dma << 11
-                   | video_dma << 10
-                   | refresh << 8
-                   | high_rom_time << 6
-                   | low_rom_time << 4
-                   | page_size << 2)
-        print("Configure MEMC: os_mode=%d sound_dma=%d video_dma=%d refresh=%d high_rom_time=%d low_rom_time=%d page_size=%d: control register write %08x" % (os_mode, sound_dma, video_dma, refresh, high_rom_time, low_rom_time, page_size, control))
+        control = (
+            0x036E0000
+            | os_mode << 12
+            | sound_dma << 11
+            | video_dma << 10
+            | refresh << 8
+            | high_rom_time << 6
+            | low_rom_time << 4
+            | page_size << 2
+        )
+        print(
+            "Configure MEMC: os_mode=%d sound_dma=%d video_dma=%d refresh=%d high_rom_time=%d low_rom_time=%d page_size=%d: control register write %08x"
+            % (
+                os_mode,
+                sound_dma,
+                video_dma,
+                refresh,
+                high_rom_time,
+                low_rom_time,
+                page_size,
+                control,
+            )
+        )
         self.write_memory_words(control, [0])
 
     def main(self):
@@ -442,5 +556,6 @@ class Postbox:
 
             print("Done!")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     Postbox().main()

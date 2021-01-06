@@ -1,3 +1,17 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import random
 import struct
 import time
@@ -56,6 +70,7 @@ SCREEN_SIZE = 160 * 1024
 MEM_TEST_MAX = RAM_SIZE  # test all RAM
 # MEM_TEST_MAX = SCREEN_SIZE  # only mess with screen memory
 
+
 def run_test():
     with postbox.Postbox() as pb:
         print("Detecting ROM speed")
@@ -75,7 +90,9 @@ def run_test():
                 break
         print("Best rom speed = %d" % rom_speed)
         if rom_speed < 1:
-            raise Exception("This doesn't look right: every platform can support rom_speed > 0")
+            raise Exception(
+                "This doesn't look right: every platform can support rom_speed > 0"
+            )
 
     with postbox.Postbox() as pb:
         pb.setup_memc(high_rom_time=rom_speed, page_size=PAGE_SIZE)
@@ -87,9 +104,9 @@ def run_test():
             pb.write_memory_word(0x3400000, w)
         # Set up DMA registers in MEMC
         for addr in [
-                0x3600000,  # vstart=0
-                0x3620000,  # vinit=0
-                0x364a000,  # vend=10240
+            0x3600000,  # vstart=0
+            0x3620000,  # vinit=0
+            0x364A000,  # vend=10240
         ]:
             pb.write_memory_word(addr, 0)
 
@@ -98,15 +115,30 @@ def run_test():
 
         print("Checking that we can read and write RAM")
         pb.write_memory_word(RAM_START, 0x12345678)  # start by writing two words
-        pb.write_memory_word(RAM_START + 4, 0x4b534154)
-        assert pb.read_memory_word(RAM_START) == 0x12345678  # make sure the first one is readable
-        assert pb.read_memory_words(RAM_START, 2) == [0x12345678, 0x4b534154]  # and both at once
-        assert pb.read_memory_bytes(RAM_START, 4) == [0x78, 0x56, 0x34, 0x12]  # and all bytes at once
+        pb.write_memory_word(RAM_START + 4, 0x4B534154)
+        assert (
+            pb.read_memory_word(RAM_START) == 0x12345678
+        )  # make sure the first one is readable
+        assert pb.read_memory_words(RAM_START, 2) == [
+            0x12345678,
+            0x4B534154,
+        ]  # and both at once
+        assert pb.read_memory_bytes(RAM_START, 4) == [
+            0x78,
+            0x56,
+            0x34,
+            0x12,
+        ]  # and all bytes at once
         assert pb.read_memory_byte(RAM_START) == 0x78  # and each byte
         assert pb.read_memory_byte(RAM_START + 1) == 0x56
         assert pb.read_memory_byte(RAM_START + 2) == 0x34
         assert pb.read_memory_byte(RAM_START + 3) == 0x12
-        assert pb.read_memory_bytes(RAM_START+3, 4) == [0x12, 0x54, 0x41, 0x53]  # test unaligned read
+        assert pb.read_memory_bytes(RAM_START + 3, 4) == [
+            0x12,
+            0x54,
+            0x41,
+            0x53,
+        ]  # test unaligned read
         pb.write_memory_byte(RAM_START + 1, 0x97)  # now try a single byte write
         assert pb.read_memory_word(RAM_START) == 0x12349778  # verify byte write
         # If we got this far, the read/write commands should be good enough to access IOC etc.
@@ -119,12 +151,19 @@ def run_test():
         #              T TBBB            AAA AA
         id_reg = pb.read_memory_word(0x03350050)  # IOEB ID; D3:0 should be 5
         print("- IOEB ID reg = %08x" % id_reg)
-        if (id_reg & 0xf) == 5:
-            print("  IOEB present: this is an A5000 (discrete IOEB) or A3010/A3020/A4000 (ARM250 with built in IOEB)")
-            assert rom_speed == 1, "Unexpected rom_speed %d for an IOEB machine (should be 1)" % rom_speed
+        if (id_reg & 0xF) == 5:
+            print(
+                "  IOEB present: this is an A5000 (discrete IOEB) or A3010/A3020/A4000 (ARM250 with built in IOEB)"
+            )
+            assert rom_speed == 1, (
+                "Unexpected rom_speed %d for an IOEB machine (should be 1)" % rom_speed
+            )
         else:
             print("  IOEB ID reg indicates no IOEB")
-            assert rom_speed == 2, "Unexpected rom_speed %d for a non-IOEB machine (should be 2)" % rom_speed
+            assert rom_speed == 2, (
+                "Unexpected rom_speed %d for a non-IOEB machine (should be 2)"
+                % rom_speed
+            )
             # This check might fail on an A540, although I think its PALs will identify it as an IOEB machine?
 
         if 0:
@@ -132,7 +171,7 @@ def run_test():
             # Alternating reading these two words results in pin exp.C23 (LA7) always high when Siorq is low.
             while 1:
                 pb.read_memory_word(0x03350000)
-                pb.read_memory_word(0x033500fc)
+                pb.read_memory_word(0x033500FC)
         if 0:
             # Debugging myelin's A5000 (this was used to find the bad latch)
             while 1:
@@ -145,7 +184,7 @@ def run_test():
                     # LA7:0 = 1001 10(00) = 0x98
                     addr = 0x03200000 + offset
                     print("read %08x -> %08x" % (addr, pb.read_memory_word(addr)))
-                    #pb.read_memory_word(0x03350050)  # alternate
+                    # pb.read_memory_word(0x03350050)  # alternate
                 print()
         while 0:
             # Debugging myelin's A5000 (this was used to find the bad latch)
@@ -171,16 +210,16 @@ def run_test():
             #   LE high = transparent mode, LE low = latched
             #   looks like IC36 is stuck in transparent mode.
             print("- IOEB ID reg = %08x" % id_reg)
-            if (id_reg & 0xf) != 5:
+            if (id_reg & 0xF) != 5:
                 print("  IOEB ID reg indicates no IOEB")
             # monitor_reg = pb.read_memory_word(0x03350070)
             # print("+ IOEB monitor type %08x" % monitor_reg)
-    #        for c0 in (0, 1):
-    #            b = 0xff if c0 else 0xc0  # drive c* low if c0==0 else undrive all
-    #            print("IOC setting c0=%d (writing %02x)" % (c0, b))
-    #            pb.write_memory_byte(0x03200000, b)
-            # print("* IOC control reg (whole word) reads as %08x" % pb.read_memory_word(0x03200000))
-            # this often reads as 00 or 20, so obviously IOC *can* drive BD* then
+        #        for c0 in (0, 1):
+        #            b = 0xff if c0 else 0xc0  # drive c* low if c0==0 else undrive all
+        #            print("IOC setting c0=%d (writing %02x)" % (c0, b))
+        #            pb.write_memory_byte(0x03200000, b)
+        # print("* IOC control reg (whole word) reads as %08x" % pb.read_memory_word(0x03200000))
+        # this often reads as 00 or 20, so obviously IOC *can* drive BD* then
 
         if 1:
             print("IOC register test (like the one in the RISC OS self-test)")
@@ -188,17 +227,22 @@ def run_test():
             for reg, addr in (
                 ("IRQMSKA", 0x03200018),
                 ("IRQMSKB", 0x03200028),
-                ):
+            ):
                 print("Testing read/write %s register at %08x" % (reg, addr))
                 for bit in range(8):
-                    for v in (1<<bit, 0xff ^ (1<<bit)):
-                        v = 1<<bit
+                    for v in (1 << bit, 0xFF ^ (1 << bit)):
+                        v = 1 << bit
                         pb.write_memory_byte(addr, v)
                         r = pb.read_memory_byte(addr)
-                        print("- Wrote %02x to %08x, read back as %02x (%s)" % (v, addr, r, "ok" if v == r else "FAIL"))
+                        print(
+                            "- Wrote %02x to %08x, read back as %02x (%s)"
+                            % (v, addr, r, "ok" if v == r else "FAIL")
+                        )
                         if v != r:
                             ioc_reg_access_ok = False
-            print("IOC register test %s" % ("PASSED" if ioc_reg_access_ok else "FAILED"))
+            print(
+                "IOC register test %s" % ("PASSED" if ioc_reg_access_ok else "FAILED")
+            )
 
         if 0:
             print("Stepping the IOC BAUD pin through various frequencies")
@@ -209,9 +253,14 @@ def run_test():
                 # i.e. for 500 kHz, latch = 1/0.5 - 1 = 1
                 # for 250 kHz, latch = 1/.25 - 1 = 3
                 baud_khz = 1000.0 / (latch + 1)
-                print("Setting TIMER2 to output a %.3f kHz signal on BAUD (IOC pin 27) by setting latch=%d" % (baud_khz, latch))
+                print(
+                    "Setting TIMER2 to output a %.3f kHz signal on BAUD (IOC pin 27) by setting latch=%d"
+                    % (baud_khz, latch)
+                )
                 pb.write_memory_bytes(0x03200060, [latch])  # T2 latch low
-                pb.write_memory_bytes(0x03200064, [(latch & 0xff00) >> 8])  # T2 latch high
+                pb.write_memory_bytes(
+                    0x03200064, [(latch & 0xFF00) >> 8]
+                )  # T2 latch high
                 pb.write_memory_bytes(0x03200068, [0])  # T2 go
                 t2_count_low = pb.read_memory_bytes(0x03200060, 1)[0]  # T2 count low
                 t2_count_high = pb.read_memory_bytes(0x03200064, 1)[0]  # T2 count high
@@ -231,16 +280,23 @@ def run_test():
         # draw blocks
         while 1:
             # stress test MEMC setup by changing rom speed every time
-            pb.setup_memc(high_rom_time=random.randint(0, rom_speed), video_dma=1, page_size=PAGE_SIZE)
+            pb.setup_memc(
+                high_rom_time=random.randint(0, rom_speed),
+                video_dma=1,
+                page_size=PAGE_SIZE,
+            )
             sw = 640
             sh = 256
             w = 64
-            h = 64>>1
-            x0 = random.randint(0, sw-w)
-            y0 = random.randint(0, sh-h)
+            h = 64 >> 1
+            x0 = random.randint(0, sw - w)
+            y0 = random.randint(0, sh - h)
             color = random.randint(0, 255)
-            print("Drawing a block in color %d at (%d,%d)-(%d,%d)" % (color, x0, y0, x0+w, y0+w))
-            for y in range(y0, y0+h):
+            print(
+                "Drawing a block in color %d at (%d,%d)-(%d,%d)"
+                % (color, x0, y0, x0 + w, y0 + w)
+            )
+            for y in range(y0, y0 + h):
                 ptr = RAM_START + y * sw + x0
                 data = bytes(color for _ in range(w))
                 pb.write_memory(ptr, data)
@@ -258,7 +314,10 @@ def run_test():
             pb.write_memory(ptr, data)
             read_data = pb.read_memory(ptr, blksize)
             if read_data != data:
-                print("Wrote %d bytes at %08x but data read back did not match" % (blksize, ptr))
+                print(
+                    "Wrote %d bytes at %08x but data read back did not match"
+                    % (blksize, ptr)
+                )
                 print("Sent: %s" % repr(data))
                 print("Recv: %s" % repr(read_data))
                 pb.write_memory_words(ptr, [0x12345678])
@@ -266,6 +325,7 @@ def run_test():
                 print(repr(bb))
                 print(hex(bb[0]))
                 stop
+
 
 def main():
     start_time = time.time()
@@ -275,5 +335,6 @@ def main():
         end_time = time.time()
         print("Test ran for %.2f s" % (end_time - start_time))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

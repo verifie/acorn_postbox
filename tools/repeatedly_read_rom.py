@@ -1,11 +1,27 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import hashlib
 import importlib
 import sys
 import traceback
 
+
 def main():
-    target_script, = sys.argv[1:]
-    if target_script.endswith(".py"): target_script = target_script[:-3]
+    (target_script,) = sys.argv[1:]
+    if target_script.endswith(".py"):
+        target_script = target_script[:-3]
     print("repeatedly running %s.py" % target_script)
     mod = importlib.import_module(target_script)
     passes = fails = crashes = 0
@@ -32,12 +48,16 @@ def main():
                 crashes += 1
             print("%d ok, %d bad, %d crashed" % (passes, fails, crashes))
     finally:
-        print("Ran %s %d times; %d ok, %d bad, %d crashed" % (target_script, n_times, passes, fails, crashes))
+        print(
+            "Ran %s %d times; %d ok, %d bad, %d crashed"
+            % (target_script, n_times, passes, fails, crashes)
+        )
         if passes == n_times:
             print("Test passed.")
         else:
             print("*** TEST FAILED ***")
             sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

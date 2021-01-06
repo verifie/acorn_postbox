@@ -1,5 +1,6 @@
 import postbox
 
+
 def main():
     with postbox.Postbox() as pb:
         # speed up ROM access.  we use the A7000 settings here:
@@ -15,6 +16,7 @@ def main():
         # pb.iomd_rom_speed(rom_bank=0, access_time=5, burst_time=3)
 
         return pb.read_memory_to_file(0, 8 * 1024 * 1024, open("bush_ibx.rom", "wb"))
+
 
 if __name__ == "__main__":
     main()
