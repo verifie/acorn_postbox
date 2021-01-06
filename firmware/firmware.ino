@@ -627,6 +627,9 @@ void loop() {
     Serial.print("MCU at ");
     Serial.print(SystemCoreClock);
     Serial.println(" MHz");
+    Serial.print("Uptime: ");
+    Serial.print(millis());
+    Serial.println(" ms");
     serial_active = 2;
     machine = ARCHIMEDES;
 
