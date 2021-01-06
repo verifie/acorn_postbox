@@ -12,4 +12,5 @@ incremental_db/
 output_files/
 __pycache__/
 *.rom
-tools/2020-*.txt
+tools/202*.gz
+tools/202*.txt

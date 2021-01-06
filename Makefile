@@ -31,9 +31,3 @@ test_post_box_usb: tests/test_post_box_usb.lxt2
 .PHONY: FORCE
 
 FORCE:
-
-MODULE=spi_bridge
-PART=xc9536xl-10-VQ44
-
-SHARED_PATH ?= ../common
-include ${SHARED_PATH}/Makefile.xilinx

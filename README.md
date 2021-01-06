@@ -1,6 +1,8 @@
 # Acorn POST interface test box
 
-[Stardot thread](https://stardot.org.uk/forums/viewtopic.php?f=16&t=17478)
+## [Discussion/support thread on Stardot](https://stardot.org.uk/forums/viewtopic.php?f=16&t=17478)
+
+## [For Sale thread on Stardot](https://stardot.org.uk/forums/viewtopic.php?f=8&t=19815)
 
 Based on philpem's work: https://github.com/philpem/acorn_postbox/
 
@@ -28,4 +30,3 @@ boards](https://stardot.org.uk/forums/viewtopic.php?f=16&t=17478&start=60#p27154
   * To test a StrongARM RISC PC, you will need a RISC OS 3.7 or 3.71 ROM set.
   * A RISC OS 3.6 ROM is also suitable if the machine has an ARM 610 processor.
   * For pre-RISC PC hardware, ideally use RISC OS 3.1 or 3.11.
-  * I have not tested this with RISC OS 2 as I don't have a RO2 ROM set.
