@@ -4,6 +4,8 @@ import subprocess
 
 import serial.tools.list_ports
 
+import config
+
 assert sys.version_info[0] >= 3, "Python 3+ required"
 
 here = os.getcwd()
@@ -48,8 +50,9 @@ if not upload_port:
 print("Using %s as the upload port" % upload_port)
 
 # Make sure we have the correct version of the Adafruit library
-subprocess.check_call("%s core install adafruit:samd@1.6.7" % (
+subprocess.check_call("%s core install %s" % (
     arduino_cli,
+    config.UPSTREAM_CORE,
 ), shell=True)
 
 # Build sketch
@@ -60,9 +63,10 @@ subprocess.check_call("%s compile %s --libraries src --build-path %s" % (
 ), shell=True)
 
 # Upload sketch
-subprocess.check_call("%s upload %s --port %s --input-dir %s" % (
-    arduino_cli,
-    std_args,
-    upload_port,
-    build_path,
-), shell=True)
+if upload_port and upload_port != 'none':
+    subprocess.check_call("%s upload %s --port %s --input-dir %s" % (
+        arduino_cli,
+        std_args,
+        upload_port,
+        build_path,
+    ), shell=True)
