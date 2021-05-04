@@ -102,7 +102,7 @@ void WDT_Handler      (void) { __BKPT(3); }
 void RTC_Handler      (void) { __BKPT(3); }
 void EIC_Handler      (void) { __BKPT(3); }
 void NVMCTRL_Handler  (void) { __BKPT(3); }
-void DMAC_Handler     (void) { __BKPT(3); }
+// void DMAC_Handler     (void) { __BKPT(3); }
 // void USB_Handler      (void) { __BKPT(3); }
 void EVSYS_Handler    (void) { __BKPT(3); }
 void SERCOM0_Handler  (void) { __BKPT(3); }
