@@ -15,6 +15,7 @@
 import glob
 import os
 import serial
+import serial.tools.list_ports
 import sys
 import time
 
@@ -22,22 +23,38 @@ assert sys.version_info[0] >= 3, "Python 3+ required"
 
 
 def guess_port():
-    # One day we'll have a proper USB VID:PID and be able to tell the
-    # difference between a POST box and a random USB serial device, but for
-    # now...
+    # Look for POSTBOX_PORT env var
     port = os.environ.get("POSTBOX_PORT")
     if port:
+        print("Using %s from POSTBOX_PORT environment variable" % port)
         return port
-    for pattern in [
-        "/dev/ttyACM?",
-        "/dev/ttyUSB?",
-        "/dev/tty.usbserial*",
-        "/dev/tty.usbmodem*",
-        "/dev/tty.wchusbserial*",
-    ]:
-        matches = glob.glob(pattern)
-        if matches:
-            return matches[0]
+
+    # Try to detect a connected POST Box or Circuit Playground
+    postbox_port = circuitplay_port = None
+    for port in serial.tools.list_ports.comports():
+        print(port.device,
+            port.product,
+            port.hwid,
+            port.vid,
+            port.pid,
+            port.manufacturer,
+        )
+        if port.vid == 0x1209 and port.pid == 0xFE06:
+            print("Found a POST Box at %s" % port.device)
+            postbox_port = port.device
+        elif port.vid == 0x239A and port.pid in (0x0018, 0x8018):
+            print("Found a Circuit Playground Express at %s" % port.device)
+            circuitplay_port = port.device
+
+    if postbox_port:
+        print("Detected a POST Box on %s" % postbox_port)
+        return postbox_port
+
+    if circuitplay_port:
+        print("Detected a Circuit Playground (probably a POST Box) on %s" % circuitplay_port)
+        return circuitplay_port
+
+    raise Exception("Could not find a connected POST Box")
 
 
 class Port:
