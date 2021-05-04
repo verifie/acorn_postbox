@@ -1,0 +1,68 @@
+# Copyright (c) 2014-2015 Arduino LLC.  All right reserved.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+menu.cache=Cache
+menu.speed=CPU Speed
+menu.opt=Optimize
+menu.maxqspi=Max QSPI
+menu.usbstack=USB Stack
+menu.debug=Debug
+
+# Myelin POST Box (ATSAMD21E18A)
+# ------------------------------
+myelin_postbox.name=Myelin POST Box
+myelin_postbox.vid.0=0x239A
+myelin_postbox.pid.0=0x8018
+myelin_postbox.vid.1=0x239A
+myelin_postbox.pid.1=0x0019
+myelin_postbox.upload.tool=bossac
+myelin_postbox.upload.protocol=sam-ba
+myelin_postbox.upload.maximum_size=262144
+myelin_postbox.upload.offset=0x2000
+myelin_postbox.upload.use_1200bps_touch=true
+myelin_postbox.upload.wait_for_upload_port=true
+myelin_postbox.upload.native_usb=true
+myelin_postbox.build.mcu=cortex-m0plus
+myelin_postbox.build.f_cpu=48000000L
+myelin_postbox.build.usb_product="POST Box"
+myelin_postbox.build.usb_manufacturer="Myelin"
+myelin_postbox.build.board=SAMD_CIRCUITPLAYGROUND_EXPRESS
+myelin_postbox.build.core=adafruit:arduino
+myelin_postbox.build.extra_flags=-DCRYSTALLESS -DARDUINO_SAMD_ZERO -D__SAMD21G18A__ -DARM_MATH_CM0PLUS -Dmyelin_postbox {build.usb_flags}
+myelin_postbox.build.ldscript=linker_scripts/gcc/flash_with_bootloader.ld
+myelin_postbox.build.openocdscript=openocd_scripts/circuit_play.cfg
+myelin_postbox.build.variant=postbox
+myelin_postbox.build.variant_system_lib=
+myelin_postbox.build.vid=0x239A
+myelin_postbox.build.pid=0x8018
+myelin_postbox.bootloader.tool=openocd
+myelin_postbox.bootloader.file=circuitplayM0/bootloader-circuitplay_m0-v2.0.0-adafruit.5.bin
+myelin_postbox.menu.opt.small=Small (-Os) (standard)
+myelin_postbox.menu.opt.small.build.flags.optimize=-Os
+myelin_postbox.menu.opt.fast=Fast (-O2)
+myelin_postbox.menu.opt.fast.build.flags.optimize=-O2
+myelin_postbox.menu.opt.faster=Faster (-O3)
+myelin_postbox.menu.opt.faster.build.flags.optimize=-O3
+myelin_postbox.menu.opt.fastest=Fastest (-Ofast)
+myelin_postbox.menu.opt.fastest.build.flags.optimize=-Ofast
+myelin_postbox.menu.opt.dragons=Here be dragons (-Ofast -funroll-loops)
+myelin_postbox.menu.opt.dragons.build.flags.optimize=-Ofast -funroll-loops
+myelin_postbox.menu.usbstack.arduino=Arduino
+myelin_postbox.menu.usbstack.tinyusb=TinyUSB
+myelin_postbox.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
+myelin_postbox.menu.debug.off=Off
+myelin_postbox.menu.debug.on=On
+myelin_postbox.menu.debug.on.build.flags.debug=-g
