@@ -15,6 +15,7 @@ if not build_path:
         here,
         "build_output_%s" % sys.platform,  # just in case things differ between platforms
     )
+artifact_path = os.path.join(here, "binaries")
 
 arduino_cli = "arduino-cli"  # in case we need a path to it at some point
 std_args = "--verbose --fqbn myelin:samd:myelin_postbox"
@@ -49,18 +50,20 @@ if not upload_port:
 
 print("Using %s as the upload port" % upload_port)
 
-# Make sure we have the correct version of the Adafruit library
-subprocess.check_call("%s core install %s" % (
-    arduino_cli,
-    config.UPSTREAM_CORE,
-), shell=True)
+if build_path != 'none':
+    # Make sure we have the correct version of the Adafruit library
+    subprocess.check_call("%s core install %s" % (
+        arduino_cli,
+        config.UPSTREAM_CORE,
+    ), shell=True)
 
-# Build sketch
-subprocess.check_call("%s compile %s --libraries src --build-path %s" % (
-    arduino_cli,
-    std_args,
-    build_path,
-), shell=True)
+    # Build sketch
+    subprocess.check_call("%s compile %s --libraries src --build-path %s --output-dir %s" % (
+        arduino_cli,
+        std_args,
+        build_path,
+        artifact_path,
+    ), shell=True)
 
 # Upload sketch
 if upload_port and upload_port != 'none':
@@ -68,5 +71,5 @@ if upload_port and upload_port != 'none':
         arduino_cli,
         std_args,
         upload_port,
-        build_path,
+        artifact_path,
     ), shell=True)
