@@ -20,6 +20,19 @@
 // For libxsvf, so we can program the FPGA
 #include "src/libxsvf/libxsvf.h"
 
+// Neopixel library from github.com/adafruit/uf2-samd1x
+#define BOARD_NEOPIXEL_PIN PIN_PA19
+#define PINOP(pin, OP) (PORT->Group[(pin) / 32].OP.reg = (1 << ((pin) % 32)))
+#define SAMD21
+#include "neopixel.h"
+
+#define RGB_OFF 0, 0, 0
+#define RGB_IDLE_NO_POWER 10, 10, 10
+#define RGB_IDLE_WITH_POWER 0, 16, 0
+#define RGB_CONNECTED 0, 16, 16
+#define RGB_RUNNING 0, 0, 16
+
+
 // This code is for an ATSAMD21E18A connected to an acorn_postbox FPGA
 // Functions provided:
 // - USB serial interface for all control
@@ -125,6 +138,11 @@ void DAC_Handler      (void) { __BKPT(3); }
 void PTC_Handler      (void) { __BKPT(3); }
 void I2S_Handler      (void) { __BKPT(3); }
 
+void set_neopixel(uint8_t r, uint8_t g, uint8_t b) {
+  uint8_t buf[3] = { g, r, b };
+  neopixel_send_buffer(buf, 3);
+}
+
 // Set MOSI/SCK/MISO/SS pins up for SPI comms with FPGA
 void select_spi() {
   fpga_spi.begin();
@@ -205,11 +223,20 @@ bool check_disconnect() {
   return true;
 }
 
+// The LED flashes when idle
+long last_neopixel_toggle = 0;
+int neopixel_state = 0;
+
 // System startup
 void setup() {
 
   pinMode(LINK_ACT_LED_PIN, OUTPUT);
   digitalWrite(LINK_ACT_LED_PIN, HIGH);  // LED off
+
+  pinMode(TARGET_POWER_PIN, INPUT);
+
+  set_neopixel(RGB_OFF);  // Avoid power glitches on startup
+  last_neopixel_toggle = millis();
 
   // Enable SPI port on SERCOM2
   select_spi();
@@ -615,6 +642,22 @@ void loop() {
       serial_active = 0;
       // Turn off LED
       digitalWrite(LINK_ACT_LED_PIN, HIGH);
+      // Force a Neopixel toggle to off (below)
+      neopixel_state = 1;
+      last_neopixel_toggle = 0;
+    }
+    if (!last_neopixel_toggle || millis() - last_neopixel_toggle > 500) {
+      last_neopixel_toggle = millis();
+      neopixel_state = !neopixel_state;
+      if (neopixel_state) {
+        if (digitalRead(TARGET_POWER_PIN)) {
+          set_neopixel(RGB_IDLE_WITH_POWER);
+        } else {
+          set_neopixel(RGB_IDLE_NO_POWER);
+        }
+      } else {
+        set_neopixel(RGB_OFF);
+      }
     }
   } else if (!serial_active) {
     // USB serial connection is active
@@ -623,7 +666,9 @@ void loop() {
   } else if (serial_active == 1 && millis() - serial_active_when > 10) {
     // Turn on LED
     digitalWrite(LINK_ACT_LED_PIN, LOW);
+    set_neopixel(RGB_CONNECTED);
     // Serial port should have settled by now
+    Serial.println("RISC OS POST Box");
     Serial.print("MCU at ");
     Serial.print(SystemCoreClock);
     Serial.println(" MHz");
@@ -686,6 +731,7 @@ void loop() {
         // Passthrough mode
         target_reset();
         Serial.println("Enter passthrough mode");
+        set_neopixel(RGB_RUNNING);
         int byte_to_send = -1;
         while (1) {
           if (check_disconnect()) break;
@@ -704,6 +750,7 @@ void loop() {
             byte_to_send = Serial.read();
           }
         }
+        set_neopixel(RGB_CONNECTED);
         break;
       }
       case 'p': {
@@ -823,6 +870,11 @@ void loop() {
         } else {
           Serial.println("Setup RAM in IOMD / A7000");
         }
+        break;
+      }
+      case 'N': {
+        Serial.println("Setting neopixel to a random color");
+        set_neopixel((uint8_t)random(0x100), (uint8_t)random(0x100), (uint8_t)random(0x100));
         break;
       }
       case 'e': {
