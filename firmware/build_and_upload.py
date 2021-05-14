@@ -50,13 +50,13 @@ if not upload_port:
 
 print("Using %s as the upload port" % upload_port)
 
-if build_path != 'none':
-    # Make sure we have the correct version of the Adafruit library
-    subprocess.check_call("%s core install %s" % (
-        arduino_cli,
-        config.UPSTREAM_CORE,
-    ), shell=True)
+# Make sure we have the correct version of the Adafruit library
+subprocess.check_call("%s core install %s" % (
+    arduino_cli,
+    config.UPSTREAM_CORE,
+), shell=True)
 
+if build_path != 'none':
     # Build sketch
     subprocess.check_call("%s compile %s --libraries src --build-path %s --output-dir %s" % (
         arduino_cli,
