@@ -14,6 +14,8 @@
 
 #include <SPI.h>
 
+#include "version.h"
+
 // For pinPeripheral(), so we can change PINMUX
 #include "wiring_private.h"
 
@@ -25,6 +27,9 @@
 #define PINOP(pin, OP) (PORT->Group[(pin) / 32].OP.reg = (1 << ((pin) % 32)))
 #define SAMD21
 #include "neopixel.h"
+
+// Brownout detector from github.com/wntrblm/Castor_and_Pollux
+#include "gem_bod.h"
 
 #define RGB_OFF 0, 0, 0
 #define RGB_IDLE_NO_POWER 10, 10, 10
@@ -230,10 +235,12 @@ int neopixel_state = 0;
 // System startup
 void setup() {
 
+  // Setup brownout detector
+  gem_wait_for_stable_voltage();
+
+  // Setup LEDs
   pinMode(LINK_ACT_LED_PIN, OUTPUT);
   digitalWrite(LINK_ACT_LED_PIN, HIGH);  // LED off
-
-  pinMode(TARGET_POWER_PIN, INPUT);
 
   set_neopixel(RGB_OFF);  // Avoid power glitches on startup
   last_neopixel_toggle = millis();
@@ -249,7 +256,7 @@ void setup() {
   sercom5.resetUART();
 
   // Set up our GPIOs
-  // pinMode(TARGET_POWERED_PIN, INPUT);
+  pinMode(TARGET_POWER_PIN, INPUT);
 
   pinMode(TARGET_RESET_PIN, OUTPUT);
   digitalWrite(TARGET_RESET_PIN, LOW);
@@ -668,7 +675,7 @@ void loop() {
     digitalWrite(LINK_ACT_LED_PIN, LOW);
     set_neopixel(RGB_CONNECTED);
     // Serial port should have settled by now
-    Serial.println("RISC OS POST Box");
+    Serial.println("RISC OS POST Box " POSTBOX_VERSION);
     Serial.print("MCU at ");
     Serial.print(SystemCoreClock);
     Serial.println(" MHz");
